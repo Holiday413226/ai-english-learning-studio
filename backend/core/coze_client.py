@@ -14,7 +14,7 @@ import sys
 import json
 import time
 import requests
-from config import COZE_API_BASE
+from core.config import COZE_API_BASE
 
 # ── Polling settings ────────────────────────────────────────────
 POLL_INTERVAL = 1.5   # seconds between status checks

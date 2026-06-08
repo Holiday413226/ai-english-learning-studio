@@ -1,8 +1,12 @@
-"""DeepSeek AI translation engine with vocabulary highlighting."""
+"""DeepSeek AI translation engine with vocabulary highlighting.
+
+Used by the Novel subsystem.  Each request carries its own api_key —
+no key is ever stored on the backend.
+"""
 
 import re
 from openai import OpenAI
-from config import DEEPSEEK_API_BASE, DEEPSEEK_MODEL, SYSTEM_PROMPT, MAX_CHUNK_SIZE
+from core.config import DEEPSEEK_API_BASE, DEEPSEEK_MODEL, SYSTEM_PROMPT, MAX_CHUNK_SIZE
 
 
 def translate(api_key, novel_text, vocab_list):
@@ -10,9 +14,9 @@ def translate(api_key, novel_text, vocab_list):
     Translate Chinese novel to English using DeepSeek API.
 
     Args:
-        api_key: DeepSeek API key
-        novel_text: Raw Chinese novel text
-        vocab_list: List of CET-4/6 vocabulary words
+        api_key: DeepSeek API key (from frontend, never persisted).
+        novel_text: Raw Chinese novel text.
+        vocab_list: List of CET-4/6 vocabulary words.
 
     Returns:
         dict: {"translated_text": str, "highlights": [{word, start, end}]}

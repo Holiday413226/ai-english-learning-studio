@@ -1,17 +1,25 @@
-"""Flask API server — AI Novel Translator + Debater.
+"""Flask API server — AI Novel Translator + Debater + Minecraft.
+
+Three fully-isolated subsystems, each with its own:
+  - Backend router   (systems/<name>/router.py)
+  - Session storage  (systems/<name>/session_storage.py → data/<name>/)
+  - Frontend module  (frontend/src/systems/<name>/)
+
+Shared core layer:
+  - core/coze_client.py  — COZE v3 async API wrapper
+  - core/config.py       — environment constants (port, API base URLs, etc.)
+
+API Keys are NEVER stored on the backend.  The frontend sends api_key / bot_id
+with every request and stores them in localStorage via configStore.js.
+
+Routes per subsystem:
+  Debater:    POST /api/debater/chat    GET|DELETE /api/debater/session
+  Novel:      POST /api/novel/translate  GET|DELETE /api/novel/session
+  Minecraft:  POST /api/minecraft/chat   GET|DELETE /api/minecraft/session
 
 Supports:
-- Dev mode:  Vite dev server proxies /api to Flask (port 5000)
-- EXE mode:  Flask serves built frontend + API on the same port
-
-Architecture (modular):
-  routers/chat_router      — COZE chat + session endpoints
-  routers/translate_router — DeepSeek translation endpoint
-  routers/config_router    — persistent config read/write + status
-  config_manager           — thread-safe config.json persistence
-  session_manager          — in-memory session store
-  shutdown                 — graceful exit handlers
-  coze_client              — COZE v3 async API wrapper
+  - Dev mode:  Vite dev server proxies /api to Flask (port 5000)
+  - EXE mode:  Flask serves built frontend + API on the same port
 """
 
 import os
@@ -21,8 +29,7 @@ import mimetypes
 import threading
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
-from config import FLASK_PORT, FLASK_HOST, MAX_CONTENT_LENGTH
-from config_manager import config_manager
+from core.config import FLASK_PORT, FLASK_HOST, MAX_CONTENT_LENGTH
 from shutdown import register_shutdown_handlers, request_shutdown, is_shutting_down
 
 
@@ -42,14 +49,14 @@ def create_app() -> Flask:
     CORS(app)
     app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
-    # ── Register modular route groups ───────────────────────────
-    from routers.chat_router import register_chat_routes
-    from routers.translate_router import register_translate_routes
-    from routers.config_router import register_config_routes
+    # ── Register subsystem route groups ─────────────────────────
+    from systems.novel.router import register_novel_routes
+    from systems.debater.router import register_debater_routes
+    from systems.minecraft.router import register_minecraft_routes
 
-    register_chat_routes(app)
-    register_translate_routes(app)
-    register_config_routes(app)
+    register_novel_routes(app)
+    register_debater_routes(app)
+    register_minecraft_routes(app)
 
     # ── Health check ────────────────────────────────────────────
     @app.route("/api/health", methods=["GET"])
@@ -97,11 +104,12 @@ if __name__ == "__main__":
     app = create_app()
     has_static = app._has_static
 
-    print(f"  Config: {config_manager.path}")
+    print("=" * 56)
     print(f"  Static: {'present' if has_static else 'missing — dev mode'}")
     print("=" * 56)
-    print("  AI Novel Translator Server")
+    print("  AI Tool Suite Server")
     print(f"  URL:  http://{FLASK_HOST}:{FLASK_PORT}")
+    print("  Subsystems: Novel, Debater, Minecraft")
     print("  Press Ctrl+C to stop the server")
     print("=" * 56)
 

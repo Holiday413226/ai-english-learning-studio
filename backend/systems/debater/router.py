@@ -1,21 +1,21 @@
-"""Debater / COZE chat routes.
+"""Debater subsystem routes.
 
-POST /api/chat     — send a message to COZE bot, get AI reply
-GET  /api/sessions — list all sessions (metadata only)
-GET  /api/sessions/<id> — get full session with messages
-DELETE /api/sessions/<id> — delete a session
+POST   /api/debater/chat      — send message to COZE bot, get AI reply
+GET    /api/debater/sessions   — list all sessions (metadata)
+GET    /api/debater/session    — get full session with messages
+DELETE /api/debater/session    — delete a session
 """
 
 from flask import request, jsonify
-from coze_client import chat_with_bot
-from session_manager import session_manager
+from core.coze_client import chat_with_bot
+from systems.debater.session_storage import debater_storage
 
 
-def register_chat_routes(app):
-    """Register chat + session routes on the Flask app."""
+def register_debater_routes(app):
+    """Register Debater subsystem routes on the Flask app."""
 
-    @app.route("/api/chat", methods=["POST"])
-    def api_chat():
+    @app.route("/api/debater/chat", methods=["POST"])
+    def debater_chat():
         """Send a message to COZE and return the AI response.
 
         Body: {
@@ -47,14 +47,14 @@ def register_chat_routes(app):
             return jsonify({"error": "Mode must be 'debate' or 'discuss'"}), 400
 
         # Ensure session exists
-        sid = session_manager.get_or_create(session_id, mode=mode, bot_id=bot_id)
+        sid = debater_storage.get_or_create(session_id, mode=mode, bot_id=bot_id)
 
         # Check message cap
-        if session_manager.is_full(sid):
+        if debater_storage.is_full(sid):
             return jsonify({"error": "Session message limit reached (100)"}), 400
 
         # Call COZE
-        conversation_id = session_manager.get_conversation_id(sid)
+        conversation_id = debater_storage.get_conversation_id(sid)
         try:
             result = chat_with_bot(
                 api_key=api_key,
@@ -69,8 +69,8 @@ def register_chat_routes(app):
                 return jsonify({"error": msg}), 401
             return jsonify({"error": msg}), 502
 
-        # Store messages in session
-        session_manager.add_messages(sid, [
+        # Store messages in session (persisted to disk)
+        debater_storage.add_messages(sid, [
             {"role": "user", "content": message, "audio_url": None},
             {
                 "role": "assistant",
@@ -82,7 +82,7 @@ def register_chat_routes(app):
         # Update COZE conversation_id for multi-turn
         conv_id = result.get("conversation_id")
         if conv_id:
-            session_manager.set_conversation_id(sid, conv_id)
+            debater_storage.set_conversation_id(sid, conv_id)
 
         return jsonify({
             "session_id": sid,
@@ -90,22 +90,34 @@ def register_chat_routes(app):
             "audio_url": result.get("audio_url"),
         })
 
-    @app.route("/api/sessions", methods=["GET"])
-    def api_list_sessions():
+    @app.route("/api/debater/sessions", methods=["GET"])
+    def debater_list_sessions():
         """Return all sessions (metadata only)."""
-        return jsonify({"sessions": session_manager.list_all()})
+        return jsonify({"sessions": debater_storage.list_all()})
 
-    @app.route("/api/sessions/<session_id>", methods=["GET"])
-    def api_get_session(session_id):
-        """Return a single session with full message history."""
-        s = session_manager.get_full(session_id)
+    @app.route("/api/debater/session", methods=["GET"])
+    def debater_get_session():
+        """Return a single session with full message history.
+
+        Query: ?session_id=xxx
+        """
+        session_id = request.args.get("session_id", "").strip()
+        if not session_id:
+            return jsonify({"error": "session_id query parameter is required"}), 400
+        s = debater_storage.get_full(session_id)
         if not s:
             return jsonify({"error": "Session not found"}), 404
         return jsonify(s)
 
-    @app.route("/api/sessions/<session_id>", methods=["DELETE"])
-    def api_delete_session(session_id):
-        """Delete a session."""
-        if session_manager.delete(session_id):
+    @app.route("/api/debater/session", methods=["DELETE"])
+    def debater_delete_session():
+        """Delete a session.
+
+        Query: ?session_id=xxx
+        """
+        session_id = request.args.get("session_id", "").strip()
+        if not session_id:
+            return jsonify({"error": "session_id query parameter is required"}), 400
+        if debater_storage.delete(session_id):
             return jsonify({"status": "deleted"})
         return jsonify({"error": "Session not found"}), 404
