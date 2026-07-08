@@ -2,6 +2,9 @@
 
 Each session is stored as data/minecraft/session_<id>.json.
 Conversation history persists across server restarts.
+
+Bot status is stored at data/minecraft/bot_status.json — writable by the
+Minebot process and readable by the companion panel endpoints.
 """
 
 import json
@@ -24,6 +27,7 @@ class MinecraftSessionStorage:
         self._system_dir = Path(data_dir) / "minecraft"
         self._system_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
+        self._bot_status_file = self._system_dir / "bot_status.json"
 
     def _session_path(self, session_id: str) -> Path:
         return self._system_dir / f"session_{session_id}.json"
@@ -142,6 +146,83 @@ class MinecraftSessionStorage:
             path.unlink()
             return True
         return False
+
+    # ── Bot Status ───────────────────────────────────────────────────
+
+    def get_bot_status(self) -> dict:
+        """Return bot online status from the bot_status.json file.
+
+        Returns:
+            {
+                bot_online: bool,
+                bot_name: str,
+                last_seen: str | None,
+                session_count: int,
+            }
+        If the file doesn't exist (Minebot hasn't written it), returns
+        offline defaults.
+        """
+        default = {
+            "bot_online": False,
+            "bot_name": "",
+            "last_seen": None,
+            "session_count": len(list(self._system_dir.glob("session_*.json"))),
+        }
+        if not self._bot_status_file.exists():
+            return default
+        try:
+            with open(self._bot_status_file, "r", encoding="utf-8") as f:
+                stored = json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return default
+
+        return {
+            "bot_online": stored.get("status") == "online",
+            "bot_name": stored.get("bot_name", ""),
+            "last_seen": stored.get("last_seen"),
+            "session_count": len(list(self._system_dir.glob("session_*.json"))),
+        }
+
+    def set_bot_offline(self) -> None:
+        """Mark the bot as offline (called when we detect it's not running)."""
+        data = {"status": "offline", "bot_name": "", "last_seen": None}
+        if self._bot_status_file.exists():
+            try:
+                with open(self._bot_status_file, "r", encoding="utf-8") as f:
+                    existing = json.load(f)
+                data["bot_name"] = existing.get("bot_name", "")
+                data["last_seen"] = existing.get("last_seen")
+            except (json.JSONDecodeError, IOError):
+                pass
+        self._write_bot_status(data)
+
+    def scan_sessions(self) -> int:
+        """Scan the data directory for session files and return count.
+
+        This mimics what a refresh trigger does — it re-reads whatever
+        the Minebot process has written to disk. The existing session
+        files are already on disk, so this is primarily a validation
+        that the caller passes.
+        """
+        files = list(self._system_dir.glob("session_*.json"))
+        return len(files)
+
+    def _write_bot_status(self, data: dict) -> None:
+        """Atomic write for bot_status.json."""
+        tmp = self._bot_status_file.with_suffix(".tmp")
+        with self._lock:
+            try:
+                with open(tmp, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=2, ensure_ascii=False)
+                os.replace(str(tmp), str(self._bot_status_file))
+            finally:
+                if tmp.exists():
+                    try:
+                        tmp.unlink()
+                    except OSError:
+                        pass
+
+    # ── Internal helpers ─────────────────────────────────────────────
 
     def _write(self, session_id: str, data: dict) -> None:
         """Atomic write to disk."""
