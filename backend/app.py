@@ -94,6 +94,10 @@ def create_app() -> Flask:
     from systems.vocab.router import register_vocab_routes
     register_vocab_routes(app)
 
+    # ── Diary routes ────────────────────────────────────────────
+    from systems.diary.router import register_diary_routes
+    register_diary_routes(app)
+
     # ── Health check ────────────────────────────────────────────
     @app.route("/api/health", methods=["GET"])
     def health():
