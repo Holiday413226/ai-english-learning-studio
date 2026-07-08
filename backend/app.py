@@ -22,11 +22,14 @@ Supports:
   - EXE mode:  Flask serves built frontend + API on the same port
 """
 
+import json
 import os
 import sys
 import time
 import mimetypes
 import threading
+from pathlib import Path
+from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from core.config import FLASK_PORT, FLASK_HOST, MAX_CONTENT_LENGTH
@@ -97,6 +100,145 @@ def create_app() -> Flask:
     # ── Diary routes ────────────────────────────────────────────
     from systems.diary.router import register_diary_routes
     register_diary_routes(app)
+
+    # ── Dashboard stats ─────────────────────────────────────────
+    @app.route("/api/dashboard/stats", methods=["GET"])
+    def dashboard_stats():
+        """Aggregate learning statistics from all subsystems.
+
+        Returns:
+            {
+              today: {novel_chars, diary_count, debate_rounds, vocab_added},
+              streak: int,
+              total_vocab: int,
+              modules: {novel: bool, diary: bool, debater: bool, minecraft: bool}
+            }
+        """
+        data_dir = app.config.get("DASHBOARD_DATA_DIR")
+        if data_dir:
+            data_root = Path(data_dir)
+        else:
+            data_root = Path(os.path.join(
+                os.path.dirname(os.path.abspath(__file__)), "data"
+            ))
+
+        now_ts = time.time()
+        today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        # Use a Unix epoch day boundary for timestamp-based comparisons:
+        # midnight today UTC as a float timestamp
+        today_start = datetime.now(timezone.utc).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ).timestamp()
+
+        # ── Novel stats ──────────────────────────────────────────
+        novel_chars = 0
+        novel_has_data = False
+        novel_dir = data_root / "novel"
+        if novel_dir.exists():
+            for sf in novel_dir.glob("session_*.json"):
+                try:
+                    with open(sf, "r", encoding="utf-8") as fh:
+                        session = json.load(fh)
+                    novel_has_data = True
+                    for msg in session.get("messages", []):
+                        if msg.get("role") == "assistant":
+                            msg_ts = msg.get("timestamp", 0)
+                            if msg_ts >= today_start:
+                                novel_chars += len(msg.get("content", ""))
+                except (json.JSONDecodeError, IOError):
+                    pass
+
+        # ── Diary stats ──────────────────────────────────────────
+        diary_count = 0
+        diary_has_data = False
+        diary_dir = data_root / "diary"
+        all_diary_dates = set()
+        if diary_dir.exists():
+            entries_path = diary_dir / "entries.json"
+            if entries_path.exists():
+                try:
+                    with open(entries_path, "r", encoding="utf-8") as fh:
+                        diary_data = json.load(fh)
+                    entries = diary_data.get("entries", [])
+                    if entries:
+                        diary_has_data = True
+                    for entry in entries:
+                        d = entry.get("date", "")
+                        if d:
+                            all_diary_dates.add(d)
+                            if d == today_str:
+                                diary_count += 1
+                except (json.JSONDecodeError, IOError):
+                    pass
+
+        # ── Streak calculation ───────────────────────────────────
+        streak = 0
+        if all_diary_dates:
+            today_dt = datetime.now(timezone.utc).date()
+            check = today_dt
+            while check.strftime("%Y-%m-%d") in all_diary_dates:
+                streak += 1
+                check = check - timedelta(days=1)
+
+        # ── Debater stats ────────────────────────────────────────
+        debate_rounds = 0
+        debater_has_data = False
+        debater_dir = data_root / "debater"
+        if debater_dir.exists():
+            for sf in debater_dir.glob("session_*.json"):
+                try:
+                    with open(sf, "r", encoding="utf-8") as fh:
+                        session = json.load(fh)
+                    debater_has_data = True
+                    for msg in session.get("messages", []):
+                        if msg.get("role") == "user":
+                            msg_ts = msg.get("timestamp", 0)
+                            if msg_ts >= today_start:
+                                debate_rounds += 1
+                except (json.JSONDecodeError, IOError):
+                    pass
+
+        # ── Vocab stats ──────────────────────────────────────────
+        vocab_added = 0
+        total_vocab = 0
+        vocab_has_data = False
+        from systems.vocab.vault import vocab_vault
+        data = vocab_vault._read_all()
+        for word_entry in data.get("words", {}).values():
+            total_vocab += 1
+            vocab_has_data = True
+            created = word_entry.get("created_at", "")
+            if created:
+                # created_at is ISO format, extract date part
+                word_date = created[:10]  # "2026-07-07" portion
+                if word_date == today_str:
+                    vocab_added += 1
+
+        # ── Minecraft stats ──────────────────────────────────────
+        minecraft_has_data = False
+        minecraft_dir = data_root / "minecraft"
+        if minecraft_dir.exists():
+            session_files = list(minecraft_dir.glob("session_*.json"))
+            if session_files:
+                minecraft_has_data = True
+
+        return jsonify({
+            "today": {
+                "novel_chars": novel_chars,
+                "diary_count": diary_count,
+                "debate_rounds": debate_rounds,
+                "vocab_added": vocab_added,
+            },
+            "streak": streak,
+            "total_vocab": total_vocab,
+            "modules": {
+                "novel": novel_has_data,
+                "diary": diary_has_data,
+                "debater": debater_has_data,
+                "minecraft": minecraft_has_data,
+            },
+        })
+>>>>>>> feat/task-7-dashboard-stats
 
     # ── Health check ────────────────────────────────────────────
     @app.route("/api/health", methods=["GET"])
