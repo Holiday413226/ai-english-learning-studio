@@ -1,7 +1,7 @@
 # SPEC.md — AI English Learning Studio v2.0.0
 
 > **Type:** B · 应用类项目
-> **Status:** Draft — awaiting cold-start validation
+> **Status:** Final — cold-start validation completed ✅
 > **Created:** 2026-07-07
 > **Brainstorming partner:** Claude Code (Claude Opus 4.8) via Superpowers `brainstorming` skill
 
