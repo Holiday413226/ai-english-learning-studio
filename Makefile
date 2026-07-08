@@ -7,6 +7,7 @@ install-dev:
 
 # ── Testing ──────────────────────────────────────────────────
 test-backend:
+	rm -rf backend/data/
 	cd backend && python -m pytest ../tests/ -v
 
 test-frontend:
