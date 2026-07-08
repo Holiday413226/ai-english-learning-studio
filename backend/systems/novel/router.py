@@ -1,6 +1,7 @@
 """Novel subsystem routes.
 
 POST /api/novel/translate  — translate Chinese novel to English (DeepSeek)
+GET  /api/novel/define     — quick vocabulary definition lookup (DeepSeek)
 GET  /api/novel/sessions    — list translation history sessions
 GET  /api/novel/session     — get session with translation history
 DELETE /api/novel/session   — delete a session
@@ -8,7 +9,7 @@ DELETE /api/novel/session   — delete a session
 
 import traceback
 from flask import request, jsonify
-from systems.novel.translator import translate
+from systems.novel.translator import translate, quick_define
 from systems.novel.session_storage import novel_storage
 
 
@@ -65,6 +66,37 @@ def register_novel_routes(app):
             novel_storage.add_message(session_id, "assistant", result.get("translated_text", "")[:500])
 
         result["session_id"] = session_id or novel_storage.create()
+        return jsonify(result)
+
+    @app.route("/api/novel/define", methods=["GET"])
+    def novel_define():
+        """Quick vocabulary definition lookup using DeepSeek.
+
+        Query params:
+            word    — the word to define (required)
+            api_key — DeepSeek API key (required)
+            context — optional sentence/context where the word appeared
+
+        Returns:
+            {phonetic, definition_en, definition_zh}
+        """
+        word = request.args.get("word", "").strip()
+        api_key = request.args.get("api_key", "").strip()
+        context = request.args.get("context", "").strip()
+
+        if not word:
+            return jsonify({"error": "'word' query parameter is required"}), 400
+        if not api_key:
+            return jsonify({"error": "'api_key' query parameter is required"}), 400
+
+        try:
+            result = quick_define(api_key, word, context)
+        except RuntimeError as e:
+            error_msg = str(e)
+            if "Invalid DeepSeek API Key" in error_msg:
+                return jsonify({"error": "Invalid API Key. Please check your DeepSeek API key."}), 401
+            return jsonify({"error": f"Definition lookup failed: {error_msg}"}), 502
+
         return jsonify(result)
 
     @app.route("/api/novel/sessions", methods=["GET"])
