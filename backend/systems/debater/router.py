@@ -1,6 +1,7 @@
 """Debater subsystem routes.
 
 POST   /api/debater/chat      — send message to COZE bot, get AI reply
+POST   /api/debater/score     — score conversation via DeepSeek
 GET    /api/debater/sessions   — list all sessions (metadata)
 GET    /api/debater/session    — get full session with messages
 DELETE /api/debater/session    — delete a session
@@ -9,6 +10,7 @@ DELETE /api/debater/session    — delete a session
 from flask import request, jsonify
 from core.coze_client import chat_with_bot
 from systems.debater.session_storage import debater_storage
+from systems.debater.scorer import score_conversation
 
 
 def register_debater_routes(app):
@@ -89,6 +91,44 @@ def register_debater_routes(app):
             "text": result["text"],
             "audio_url": result.get("audio_url"),
         })
+
+    @app.route("/api/debater/score", methods=["POST"])
+    def debater_score():
+        """Score a full conversation using DeepSeek analysis.
+
+        Body: {
+            api_key: str,
+            session_id: str
+        }
+        Returns: { grammar, vocabulary, logic, fluency, suggestions }
+        """
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "Request body must be JSON"}), 400
+
+        api_key = data.get("api_key", "").strip()
+        session_id = data.get("session_id", "").strip()
+
+        if not api_key:
+            return jsonify({"error": "api_key is required"}), 400
+        if not session_id:
+            return jsonify({"error": "session_id is required"}), 400
+
+        # Get messages from session
+        messages = debater_storage.get_messages_for_scoring(session_id)
+        if messages is None:
+            return jsonify({"error": "Session not found"}), 404
+
+        if len(messages) == 0:
+            return jsonify({"error": "Session has no messages to score"}), 400
+
+        # Run scoring
+        try:
+            result = score_conversation(api_key, messages)
+        except RuntimeError as e:
+            return jsonify({"error": str(e)}), 502
+
+        return jsonify(result)
 
     @app.route("/api/debater/sessions", methods=["GET"])
     def debater_list_sessions():

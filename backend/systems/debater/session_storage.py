@@ -138,6 +138,20 @@ class DebaterSessionStorage:
             "updated_at": session.get("updated_at", 0),
         }
 
+    def get_messages_for_scoring(self, session_id: str) -> list[dict] | None:
+        """Return the message list for scoring, or None if the session doesn't exist.
+
+        Only returns user and assistant messages with role+content — no metadata.
+        """
+        session = self.load(session_id)
+        if session is None:
+            return None
+        return [
+            {"role": m["role"], "content": m["content"]}
+            for m in session.get("messages", [])
+            if m.get("role") in ("user", "assistant")
+        ]
+
     def delete(self, session_id: str) -> bool:
         """Delete a session file. Returns True if it existed."""
         path = self._session_path(session_id)
