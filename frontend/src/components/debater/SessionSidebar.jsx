@@ -1,7 +1,7 @@
 /**
  * SessionSidebar — left panel displaying past chat sessions.
  */
-import useDebaterStore from "../../store/debaterStore";
+import useDebaterStore from "../../systems/debater/store";
 
 export default function SessionSidebar({ onSettingsOpen }) {
   const {

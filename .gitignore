@@ -17,12 +17,24 @@ backend/build/
 backend/dist/
 *.spec
 
+# Runtime data (session JSON files, generated at runtime)
+backend/data/
+
 # Runtime config (generated on first launch)
 backend/config.json
 
 # IDE
 .vscode/
 .idea/
+
+# Claude Code local config (DO NOT commit — contains hooks, settings, memory)
+.claude/
+
+# Minebot runtime & secrets
+Minebot/mindcraft/node_modules/
+Minebot/mindcraft/keys.json
+Minebot/mindcraft/histories/
+Minebot/mindcraft/bots/
 
 # OS
 .DS_Store

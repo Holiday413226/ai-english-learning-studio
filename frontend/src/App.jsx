@@ -1,41 +1,27 @@
+/**
+ * App — root component.
+ *
+ * Three fully-isolated subsystems, each with its own:
+ *   - Backend router   (systems/<name>/router.py)
+ *   - Session storage  (data/<name>/)
+ *   - Frontend module  (systems/<name>/)
+ *
+ * Global config (API keys, Bot IDs) lives in configStore (localStorage).
+ * The backend NEVER stores sensitive keys — every request carries its own.
+ */
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
-import EnglishNovel from "./pages/EnglishNovel";
-import Debater from "./pages/Debater";
-import Minecrafter from "./pages/Minecrafter";
-import { getBackendConfig, requestShutdown } from "./api";
-import useDebaterStore from "./store/debaterStore";
+import NovelPage from "./systems/novel/NovelPage";
+import DebaterPage from "./systems/debater/DebaterPage";
+import MinecraftPage from "./systems/minecraft/MinecraftPage";
 import "./App.css";
 
 export default function App() {
-  const setSettings = useDebaterStore((s) => s.setSettings);
-
-  // On mount: sync settings from backend config.json → Zustand store.
-  // This ensures the EXE remembers API keys / Bot IDs across restarts.
-  useEffect(() => {
-    let cancelled = false;
-    getBackendConfig()
-      .then((cfg) => {
-        if (cancelled) return;
-        setSettings({
-          apiKey: cfg.api_key || "",
-          debateBotId: cfg.bot_id_debate || "",
-          discussBotId: cfg.bot_id_discuss || "",
-          cozeApiUrl: cfg.coze_api_url || "",
-        });
-      })
-      .catch(() => {
-        // Backend unreachable (dev mode?) — fall back to localStorage values
-      });
-    return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
   // On tab/window close: tell the backend to shut down (EXE mode).
   // No-op if the backend is already gone or in dev mode.
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // Use navigator.sendBeacon for reliable fire-and-forget
       navigator.sendBeacon("/api/shutdown");
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
@@ -48,9 +34,9 @@ export default function App() {
         <Sidebar />
         <div className="main-area">
           <Routes>
-            <Route path="/" element={<EnglishNovel />} />
-            <Route path="/debater" element={<Debater />} />
-            <Route path="/minecrafter" element={<Minecrafter />} />
+            <Route path="/" element={<NovelPage />} />
+            <Route path="/debater" element={<DebaterPage />} />
+            <Route path="/minecrafter" element={<MinecraftPage />} />
           </Routes>
         </div>
       </div>

@@ -58,6 +58,42 @@ def create_app() -> Flask:
     register_debater_routes(app)
     register_minecraft_routes(app)
 
+    # ── Config / Keyring routes ─────────────────────────────────
+    from systems.config.keyring_store import set_key, get_key, get_status, delete_all_keys
+
+    @app.route("/api/config/set", methods=["POST"])
+    def config_set():
+        """Store an API key or bot ID in Windows Credential Manager."""
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "Request body must be JSON"}), 400
+        key = data.get("key", "").strip()
+        value = data.get("value", "")
+        if not key:
+            return jsonify({"error": "'key' is required"}), 400
+        try:
+            set_key(key, value)
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        except RuntimeError as e:
+            return jsonify({"error": str(e)}), 500
+        return jsonify({"status": "ok"})
+
+    @app.route("/api/config/status", methods=["GET"])
+    def config_status():
+        """Return which keys are configured (booleans, no plaintext)."""
+        return jsonify(get_status())
+
+    @app.route("/api/config/keys", methods=["DELETE"])
+    def config_delete_keys():
+        """Delete all stored keys from the credential manager."""
+        delete_all_keys()
+        return jsonify({"status": "cleared"})
+
+    # ── Vocab Vault routes ─────────────────────────────────────
+    from systems.vocab.router import register_vocab_routes
+    register_vocab_routes(app)
+
     # ── Health check ────────────────────────────────────────────
     @app.route("/api/health", methods=["GET"])
     def health():

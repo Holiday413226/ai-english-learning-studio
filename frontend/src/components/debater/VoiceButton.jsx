@@ -4,7 +4,7 @@
  */
 import { useRef, useEffect, useCallback } from "react";
 import useVoiceRecognition from "../../hooks/useVoiceRecognition";
-import useDebaterStore, { VoiceState } from "../../store/debaterStore";
+import useDebaterStore, { VoiceState } from "../../systems/debater/store";
 
 export default function VoiceButton({ disabled, onResult }) {
   const canvasRef = useRef(null);
