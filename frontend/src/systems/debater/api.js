@@ -52,3 +52,19 @@ export async function deleteSessionApi(id) {
   );
   return response.json();
 }
+
+export async function getDebateScore(apiKey, sessionId) {
+  const response = await fetch(`${API_BASE}/score`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key: apiKey,
+      session_id: sessionId,
+    }),
+  });
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || `HTTP ${response.status}`);
+  }
+  return data;
+}

@@ -23,7 +23,7 @@ import ChatBubble from "../../components/debater/ChatBubble";
 import ChatInput from "../../components/debater/ChatInput";
 import useConfigStore from "../../store/configStore";
 import useDebaterStore, { VoiceState } from "./store";
-import { postChat } from "./api";
+import { postChat, getDebateScore } from "./api";
 
 export default function DebaterPage() {
   // ── Global config ──────────────────────────────────────────
@@ -31,6 +31,7 @@ export default function DebaterPage() {
   const cozeApiUrl = useConfigStore((s) => s.cozeApiUrl);
   const debateBotId = useConfigStore((s) => s.debateBotId);
   const discussBotId = useConfigStore((s) => s.discussBotId);
+  const deepseekApiKey = useConfigStore((s) => s.deepseekApiKey);
 
   // ── Subsystem state ────────────────────────────────────────
   const {
@@ -50,6 +51,8 @@ export default function DebaterPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [scoring, setScoring] = useState(false);
+  const [scoreResult, setScoreResult] = useState(null);
   const messagesEndRef = useRef(null);
 
   // First-launch: if no COZE API key, force settings modal
@@ -76,6 +79,21 @@ export default function DebaterPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [sessions, currentSessionId]);
+
+  // ── Scoring handler ──────────────────────────────────────
+  const handleScore = useCallback(async () => {
+    if (!deepseekApiKey || !currentSessionId) return;
+    setScoring(true);
+    setScoreResult(null);
+    try {
+      const result = await getDebateScore(deepseekApiKey, currentSessionId);
+      setScoreResult(result);
+    } catch (err) {
+      setScoreResult({ error: err.message });
+    } finally {
+      setScoring(false);
+    }
+  }, [deepseekApiKey, currentSessionId]);
 
   // ── Send message handler ─────────────────────────────────
   const handleSend = useCallback(
@@ -232,6 +250,65 @@ export default function DebaterPage() {
             {error && (
               <div className="debater-error nes-container is-rounded">
                 <p>⚠ {error}</p>
+              </div>
+            )}
+
+            {/* ── Score Button (shown when there are messages) ── */}
+            {currentMessages.length > 0 && !loading && (
+              <div style={{ textAlign: "center", margin: "8px 0" }}>
+                <button
+                  className="nes-btn is-success"
+                  style={{ fontSize: "0.5rem" }}
+                  onClick={handleScore}
+                  disabled={scoring || !deepseekApiKey}
+                >
+                  {scoring ? "⚙ Scoring..." : "📊 Score this Debate"}
+                </button>
+                {!deepseekApiKey && (
+                  <p style={{ fontSize: "0.4rem", color: "#ff6b8a", marginTop: 4 }}>
+                    DeepSeek API Key required for scoring. Configure in Settings ⚙
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* ── Score Result ────────────────────────────────── */}
+            {scoreResult && !scoreResult.error && (
+              <div className="window" style={{ padding: "14px 18px", marginTop: 8 }}>
+                <h4 style={{ fontSize: "0.55rem", color: "#50fa7b", margin: "0 0 10px", fontFamily: "'Press Start 2P', monospace" }}>
+                  📊 Debate Score
+                </h4>
+                <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
+                  {[
+                    { k: "grammar", label: "Grammar", max: 10 },
+                    { k: "vocabulary", label: "Vocabulary", max: 10 },
+                    { k: "logic", label: "Logic", max: 10 },
+                    { k: "fluency", label: "Fluency", max: 10 },
+                  ].map(({ k, label, max }) => (
+                    <div key={k} style={{ flex: 1, textAlign: "center" }}>
+                      <div style={{ fontSize: "0.4rem", color: "#7a6a9a" }}>{label}</div>
+                      <div style={{ fontSize: "1rem", fontFamily: "'Press Start 2P', monospace", color: "#50fa7b" }}>
+                        {scoreResult[k] ?? "-"}/{max}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {(scoreResult.suggestions || []).length > 0 && (
+                  <div>
+                    <p style={{ fontSize: "0.45rem", color: "#9b8ab8", marginBottom: 4 }}>💡 Suggestions:</p>
+                    {scoreResult.suggestions.map((s, i) => (
+                      <p key={i} style={{ fontSize: "0.45rem", color: "#6a5a8a", margin: "2px 0", paddingLeft: 8 }}>
+                        • {s}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {scoreResult?.error && (
+              <div className="debater-error nes-container is-rounded">
+                <p>⚠ Score failed: {scoreResult.error}</p>
               </div>
             )}
 
