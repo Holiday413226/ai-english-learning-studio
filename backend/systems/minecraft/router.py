@@ -1,9 +1,15 @@
-"""Minecraft subsystem routes (placeholder).
+"""Minecraft subsystem routes.
 
-POST   /api/minecraft/chat      — send message to COZE bot, get AI reply
-GET    /api/minecraft/sessions   — list all sessions (metadata)
-GET    /api/minecraft/session    — get full session with messages
-DELETE /api/minecraft/session    — delete a session
+POST   /api/minecraft/chat               — send message to COZE bot, get AI reply
+GET    /api/minecraft/sessions            — list all sessions (metadata)
+GET    /api/minecraft/session             — get full session with messages
+DELETE /api/minecraft/session             — delete a session
+
+Companion panel endpoints (read-only):
+GET    /api/minecraft/companion/status    — bot online status + session count
+GET    /api/minecraft/companion/sessions  — list sessions (companion format)
+GET    /api/minecraft/companion/session   — full session (companion format)
+POST   /api/minecraft/companion/refresh   — trigger session scan from disk
 """
 
 from flask import request, jsonify
@@ -118,3 +124,48 @@ def register_minecraft_routes(app):
         if minecraft_storage.delete(session_id):
             return jsonify({"status": "deleted"})
         return jsonify({"error": "Session not found"}), 404
+
+    # ── Companion panel endpoints (read-only) ──────────────────────
+
+    @app.route("/api/minecraft/companion/status", methods=["GET"])
+    def companion_status():
+        """Return bot online status, name, last_seen, and session count.
+
+        GET /api/minecraft/companion/status
+        → {bot_online: bool, bot_name: str, last_seen: str|null, session_count: int}
+        """
+        return jsonify(minecraft_storage.get_bot_status())
+
+    @app.route("/api/minecraft/companion/sessions", methods=["GET"])
+    def companion_list_sessions():
+        """List all sessions with metadata (companion format).
+
+        GET /api/minecraft/companion/sessions
+        → {sessions: [{session_id, message_count, updated_at, preview}]}
+        """
+        return jsonify({"sessions": minecraft_storage.list_all()})
+
+    @app.route("/api/minecraft/companion/session", methods=["GET"])
+    def companion_get_session():
+        """Return a single session with full message history.
+
+        GET /api/minecraft/companion/session?session_id=xxx
+        → {session_id, messages: [...], updated_at}
+        """
+        session_id = request.args.get("session_id", "").strip()
+        if not session_id:
+            return jsonify({"error": "session_id query parameter is required"}), 400
+        s = minecraft_storage.get_full(session_id)
+        if not s:
+            return jsonify({"error": "Session not found"}), 404
+        return jsonify(s)
+
+    @app.route("/api/minecraft/companion/refresh", methods=["POST"])
+    def companion_refresh():
+        """Trigger a re-scan of session files from the Minebot data directory.
+
+        POST /api/minecraft/companion/refresh
+        → {status: "ok", sessions_found: int}
+        """
+        count = minecraft_storage.scan_sessions()
+        return jsonify({"status": "ok", "sessions_found": count})
