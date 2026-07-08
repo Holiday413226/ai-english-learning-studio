@@ -238,7 +238,6 @@ def create_app() -> Flask:
                 "minecraft": minecraft_has_data,
             },
         })
->>>>>>> feat/task-7-dashboard-stats
 
     # ── Health check ────────────────────────────────────────────
     @app.route("/api/health", methods=["GET"])
