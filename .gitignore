@@ -39,3 +39,4 @@ Minebot/mindcraft/bots/
 # OS
 .DS_Store
 Thumbs.db
+backend/data/
