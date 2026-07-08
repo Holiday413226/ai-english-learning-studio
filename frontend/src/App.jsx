@@ -1,7 +1,8 @@
 /**
  * App — root component.
  *
- * Three fully-isolated subsystems, each with its own:
+ * Six subsystems (Dashboard / Novel / Diary / Debater / Minecraft / Vocab Vault),
+ * each with its own:
  *   - Backend router   (systems/<name>/router.py)
  *   - Session storage  (data/<name>/)
  *   - Frontend module  (systems/<name>/)
@@ -12,14 +13,15 @@
 import { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
+import DashboardPage from "./systems/dashboard/DashboardPage";
 import NovelPage from "./systems/novel/NovelPage";
+import DiaryPage from "./systems/diary/DiaryPage";
 import DebaterPage from "./systems/debater/DebaterPage";
 import MinecraftPage from "./systems/minecraft/MinecraftPage";
+import VocabPage from "./systems/vocab/VocabPage";
 import "./App.css";
 
 export default function App() {
-  // On tab/window close: tell the backend to shut down (EXE mode).
-  // No-op if the backend is already gone or in dev mode.
   useEffect(() => {
     const handleBeforeUnload = () => {
       navigator.sendBeacon("/api/shutdown");
@@ -34,9 +36,12 @@ export default function App() {
         <Sidebar />
         <div className="main-area">
           <Routes>
-            <Route path="/" element={<NovelPage />} />
+            <Route path="/" element={<DashboardPage />} />
+            <Route path="/novel" element={<NovelPage />} />
+            <Route path="/diary" element={<DiaryPage />} />
             <Route path="/debater" element={<DebaterPage />} />
             <Route path="/minecrafter" element={<MinecraftPage />} />
+            <Route path="/vocab" element={<VocabPage />} />
           </Routes>
         </div>
       </div>

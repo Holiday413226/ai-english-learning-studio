@@ -1,24 +1,12 @@
 import { useLocation, useNavigate } from "react-router-dom";
 
 const NAV_ITEMS = [
-  {
-    path: "/",
-    label: "EnglishNovel",
-    layer: "LAYER 1",
-    icon: "📖",
-  },
-  {
-    path: "/debater",
-    label: "Debater",
-    layer: "LAYER 2",
-    icon: "⚔️",
-  },
-  {
-    path: "/minecrafter",
-    label: "Minecrafter",
-    layer: "LAYER 3",
-    icon: "⛏️",
-  },
+  { path: "/",           label: "Dashboard",    layer: "HOME",  icon: "🏠" },
+  { path: "/novel",      label: "EnglishNovel", layer: "LAYER 1", icon: "📖" },
+  { path: "/diary",      label: "Diary",        layer: "LAYER 2", icon: "✍️" },
+  { path: "/debater",    label: "Debater",      layer: "LAYER 3", icon: "⚔️" },
+  { path: "/minecrafter",label: "Minecrafter",  layer: "LAYER 4", icon: "⛏️" },
+  { path: "/vocab",      label: "VocabVault",   layer: "VAULT",  icon: "📚" },
 ];
 
 export default function Sidebar() {
@@ -34,7 +22,7 @@ export default function Sidebar() {
     <aside className="sidebar">
       <div className="sidebar-brand">
         <span className="sidebar-logo">AI</span>
-        <span className="sidebar-sub">Tool Suite</span>
+        <span className="sidebar-sub">English Studio</span>
       </div>
 
       <nav className="sidebar-nav">
@@ -52,7 +40,7 @@ export default function Sidebar() {
       </nav>
 
       <div className="sidebar-footer">
-        <p>v1.2.0</p>
+        <p>v2.0.0</p>
       </div>
     </aside>
   );
