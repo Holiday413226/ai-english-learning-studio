@@ -9,6 +9,35 @@
 **Tech Stack:** Python Flask 3.x, React 18 + Vite 5 + NES.css + Zustand 4, DeepSeek API (OpenAI SDK), COZE Bot API v3, `keyring` library, PyInstaller, pytest, Vitest
 
 **Plan created:** 2026-07-07 | **Spec:** SPEC.md
+**Last updated:** 2026-07-08 | **Status:** All 18 tasks complete ✅ | **Tests:** 51 passed
+
+## Task Completion Log
+
+| Task | Description | Status | Commit |
+|------|-------------|--------|--------|
+| 1 | Keyring config endpoints | ✅ | `4241795` |
+| 2 | Vocab Vault backend (SM-2 + quiz) | ✅ | `4241795` |
+| 3 | Diary backend (grader + router) | ✅ | `1b7bbeb` |
+| 4 | Minecraft companion endpoints | ✅ | `7b64dcd` |
+| 5 | Novel vocabulary define endpoint | ✅ | `d0fd9f1` |
+| 6 | Debater scoring endpoint | ✅ | `3287a10` |
+| 7 | Dashboard stats aggregation | ✅ | `6007e72` |
+| 8 | Sidebar + App.jsx route update | ✅ | `0e7168a` |
+| 9 | Dashboard page (frontend) | ✅ | `0e7168a` |
+| 10 | Diary page (frontend) | ✅ | `0e7168a` |
+| 11 | Minecraft Companion page (rewrite) | ✅ | `0e7168a` |
+| 12 | Vocab Vault page (flashcard + quiz) | ✅ | `0e7168a` |
+| 13 | VocabStar component + 4-module integration | ✅ | `0e7168a` |
+| 14 | SetupModal keyring integration | ✅ | (via frontend SetupModal.jsx) |
+| 15 | Makefile + test infrastructure | ✅ | `9e5d5b8` |
+| 16 | .gitlab-ci.yml | ✅ | `9e5d5b8` |
+| 17 | GitHub Actions release workflow | ✅ | (inherited from v1.2.0) |
+| 18 | README + final documentation | ✅ | `c19d70e` |
+
+**Additional commits (post-plan):**
+- `4d1989d` — Debate Scoring button and result panel in DebaterPage UI
+- `c5e91ce` — Fix test pollution (cleanup data/ before test-backend)
+- `da715fb` — Update banner to v2.0.0
 
 ## Global Constraints
 
