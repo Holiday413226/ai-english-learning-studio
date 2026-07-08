@@ -288,9 +288,9 @@ if __name__ == "__main__":
     print("=" * 56)
     print(f"  Static: {'present' if has_static else 'missing — dev mode'}")
     print("=" * 56)
-    print("  AI Tool Suite Server")
+    print("  AI English Learning Studio v2.0.0")
     print(f"  URL:  http://{FLASK_HOST}:{FLASK_PORT}")
-    print("  Subsystems: Novel, Debater, Minecraft")
+    print("  Modules: Dashboard, Novel, Diary, Debater, Minecraft, Vocab Vault")
     print("  Press Ctrl+C to stop the server")
     print("=" * 56)
 
