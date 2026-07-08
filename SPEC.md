@@ -437,7 +437,7 @@ Web 面板 ← 读取日志 ←─────────┘
 | AC1 | Dashboard | 首页正确显示四个模块的今日统计 + streak + 快捷入口 |
 | AC2 | Diary 批改 | 提交英语短文 → 10s 内返回逐句批改 + 评分 |
 | AC3 | Diary 打卡 | 连续提交 3 天 → Dashboard 热力图显示 3 天 streak |
-| AC4 | Minecraft UI | Minecraft 页面从 placeholder 变为完整聊天界面 |
+| AC4 | Minecraft UI | Minecraft 页面从 placeholder 变为伴侣面板（只读对话日志 + bot 在线状态 + 5s 轮询 + 词汇收藏），不提供发送消息 UI |
 | AC5 | 词汇收藏 | Novel/Debater/Minecraft/Diary 任意模块点击 ⭐ → vault.json 新增条目 |
 | AC6 | Vocab Vault 闪卡 | 闪卡翻转动画正常，SM-2 间隔正确计算 |
 | AC7 | Vocab Vault 测验 | 四选一测验 → 10 题后显示正确率 |
@@ -479,6 +479,6 @@ Web 面板 ← 读取日志 ←─────────┘
 | **新增** | Windows Credential Manager 凭据存储 |
 | **增强** | Novel Translator — hover 释义 + 词汇收藏 |
 | **增强** | Debater — 辩论评分 + 词汇收藏 |
-| **补齐** | Minecraft Chat — 从 placeholder UI 到完整聊天界面 |
+| **增强** | Minecraft Companion — 从 PCL placeholder 到伴侣面板（只读对话日志 + 词汇收藏 + bot 状态） |
 | **增强** | Sidebar 从 3 个入口 → 6 个入口（Dashboard, Novel, Diary, Debater, Minecraft, Vocab Vault） |
 | **变更** | 凭据从纯 localStorage → keyring + localStorage 混合 |
