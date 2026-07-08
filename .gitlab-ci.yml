@@ -1,0 +1,15 @@
+stages:
+  - test
+
+unit-test:
+  stage: test
+  image: python:3.12
+  before_script:
+    - cd backend
+    - pip install -r requirements.txt
+    - pip install pytest
+  script:
+    - cd backend && python -m pytest ../tests/ -v --junitxml=../report.xml
+  artifacts:
+    reports:
+      junit: report.xml
