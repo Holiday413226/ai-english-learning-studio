@@ -33,12 +33,13 @@ AI 驱动的英语学习桌面应用 —— 六模块学习闭环：翻译阅读
 
 ### EXE 模式（推荐）
 
-1. 下载 `AIEnglishStudio.exe`（51MB）
-2. 双击运行 → 浏览器自动打开 `http://127.0.0.1:5000`
+1. 下载 `AIEnglishStudio.exe`（53MB）
+2. 双击运行 → 桌面窗口自动打开（原生 Windows 窗口，内嵌 WebView2 引擎）
 3. 首次运行点击 ⚙ Settings 配置 API Key：
    - 翻译/日记/评分：DeepSeek API Key（在 [platform.deepseek.com](https://platform.deepseek.com) 获取）
    - 辩论/Minecraft：COZE API Key + Bot ID（在 [coze.cn](https://www.coze.cn) 创建）
 4. Key 安全存储在 Windows Credential Manager 中，后续自动读取
+5. 关闭窗口即退出应用
 
 ### 开发模式
 
@@ -75,7 +76,7 @@ npm run dev
 
 | 形态 | 文件 | 大小 |
 |------|------|------|
-| Windows EXE | `backend/dist/AIEnglishStudio.exe` | 51MB |
+| Windows EXE | `backend/dist/AIEnglishStudio.exe` | 53MB |
 | 源码 ZIP | `AI-English-Learning-Studio-v2.0.0-source.zip` | 575KB |
 | Git Bundle | `AI-English-Studio-v2.0.0.bundle`（33 commits）| 605KB |
 
@@ -198,6 +199,7 @@ agent/
 | 层级 | 技术 |
 |------|------|
 | **前端** | React 18 + Vite 5 + NES.css + Zustand 4 |
+| **桌面壳** | pywebview (Edge WebView2) |
 | **后端** | Python Flask 3.x |
 | **AI 引擎** | DeepSeek API (OpenAI SDK) + COZE Bot API v3 |
 | **凭据存储** | keyring → Windows Credential Manager |
