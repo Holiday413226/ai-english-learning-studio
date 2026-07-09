@@ -278,7 +278,7 @@ def create_app() -> Flask:
 # ── Startup ────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    import webbrowser
+    import webview
 
     register_shutdown_handlers()
 
@@ -291,16 +291,9 @@ if __name__ == "__main__":
     print("  AI English Learning Studio v2.0.0")
     print(f"  URL:  http://{FLASK_HOST}:{FLASK_PORT}")
     print("  Modules: Dashboard, Novel, Diary, Debater, Minecraft, Vocab Vault")
-    print("  Press Ctrl+C to stop the server")
     print("=" * 56)
 
-    if has_static:
-        threading.Timer(
-            1.0,
-            lambda: webbrowser.open(f"http://{FLASK_HOST}:{FLASK_PORT}"),
-        ).start()
-
-    # EXE mode: Flask in daemon thread, main thread watches for exit.
+    # EXE / GUI mode: Flask in daemon thread, desktop window via pywebview.
     if getattr(sys, "frozen", False):
         flask_thread = threading.Thread(
             target=lambda: app.run(
@@ -312,17 +305,31 @@ if __name__ == "__main__":
             daemon=True,
         )
         flask_thread.start()
-        try:
-            while not is_shutting_down():
-                time.sleep(1)
-        except KeyboardInterrupt:
-            pass
-        finally:
-            request_shutdown()
-            print("\n  Exiting...", file=sys.stderr)
-            flask_thread.join(timeout=3)
-            sys.exit(0)
+
+        # Give Flask a moment to start, then launch the native window.
+        time.sleep(1.0)
+
+        webview.create_window(
+            title="AI English Learning Studio v2.0.0",
+            url=f"http://{FLASK_HOST}:{FLASK_PORT}",
+            width=1200,
+            height=800,
+            min_size=(900, 600),
+        )
+        webview.start()
+
+        # Window closed — shut down.
+        request_shutdown()
+        sys.exit(0)
+
+    # Dev mode: open browser, run Flask in foreground.
     else:
+        if has_static:
+            threading.Timer(
+                1.0,
+                lambda: webbrowser.open(f"http://{FLASK_HOST}:{FLASK_PORT}"),
+            ).start()
+
         try:
             app.run(debug=False, host=FLASK_HOST, port=FLASK_PORT, use_reloader=False)
         except KeyboardInterrupt:
