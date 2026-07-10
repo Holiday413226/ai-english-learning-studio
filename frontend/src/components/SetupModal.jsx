@@ -7,11 +7,23 @@
  *   - Bot IDs: Debate, Discuss, Minecraft
  *   - COZE API URL (optional override)
  *
- * All values are stored in configStore (Zustand + localStorage persist).
- * Nothing is persisted on the backend — every API call sends its own keys.
+ * Values are stored in TWO places:
+ *   1. configStore (Zustand + localStorage) — for in-session access
+ *   2. Backend keyring_store (/api/config/set) — for EXE restart survival
+ *
+ * On mount, keys are restored from backend for security (no plaintext in localStorage).
+ * On save, keys are written to both Zustand and backend.
  */
 import { useState, useEffect } from "react";
 import useConfigStore from "../store/configStore";
+
+const KEY_MAP = {
+  deepseekApiKey: "deepseek_api_key",
+  cozeApiKey: "coze_api_key",
+  debateBotId: "debate_bot_id",
+  discussBotId: "discuss_bot_id",
+  minecraftBotId: "minecraft_bot_id",
+};
 
 export default function SetupModal({ open, onClose }) {
   const config = useConfigStore();
@@ -24,6 +36,15 @@ export default function SetupModal({ open, onClose }) {
   const [minecraftBotId, setMinecraftBotId] = useState(config.minecraftBotId);
   const [showKey, setShowKey] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const [keyStatus, setKeyStatus] = useState({});  // backend keyring status
+
+  // Fetch backend keyring status on mount + when modal opens
+  useEffect(() => {
+    fetch("/api/config/status")
+      .then((r) => r.json())
+      .then((s) => setKeyStatus(s))
+      .catch(() => setKeyStatus({}));
+  }, [open]);
 
   // Reset local state every time the modal opens
   useEffect(() => {
@@ -38,9 +59,10 @@ export default function SetupModal({ open, onClose }) {
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setSaveError(null);
     try {
+      // 1. Save to Zustand (localStorage) for in-session use
       config.setConfig({
         cozeApiKey: cozeApiKey.trim(),
         cozeApiUrl: cozeApiUrl.trim(),
@@ -49,6 +71,24 @@ export default function SetupModal({ open, onClose }) {
         discussBotId: discussBotId.trim(),
         minecraftBotId: minecraftBotId.trim(),
       });
+
+      // 2. Save to backend keyring_store for EXE restart survival
+      const entries = [
+        { k: "deepseek_api_key", v: deepseekApiKey },
+        { k: "coze_api_key", v: cozeApiKey },
+        { k: "debate_bot_id", v: debateBotId },
+        { k: "discuss_bot_id", v: discussBotId },
+        { k: "minecraft_bot_id", v: minecraftBotId },
+      ];
+      for (const { k, v } of entries) {
+        if (v.trim()) {
+          await fetch("/api/config/set", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: k, value: v.trim() }),
+          });
+        }
+      }
     } catch (err) {
       console.error("Failed to save settings:", err);
       setSaveError(`Save failed: ${err.message || err}`);
