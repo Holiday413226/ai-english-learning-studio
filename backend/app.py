@@ -91,6 +91,25 @@ def create_app() -> Flask:
         """Return which keys are configured (booleans, no plaintext)."""
         return jsonify(get_status())
 
+    @app.route("/api/config/get", methods=["GET"])
+    def config_get():
+        """Return ALL stored keys (plaintext). Called by App on mount to restore Zustand.
+        Protected by localhost-only check — same as /api/shutdown."""
+        if request.remote_addr not in ("127.0.0.1", "::1", "localhost"):
+            return jsonify({"error": "Forbidden"}), 403
+        name_map = {
+            "deepseek_api_key": "deepseekApiKey",
+            "coze_api_key": "cozeApiKey",
+            "debate_bot_id": "debateBotId",
+            "discuss_bot_id": "discussBotId",
+            "minecraft_bot_id": "minecraftBotId",
+        }
+        result = {}
+        for key_name, frontend_name in name_map.items():
+            val = get_key(key_name)
+            result[frontend_name] = val if val else ""
+        return jsonify(result)
+
     @app.route("/api/config/keys", methods=["DELETE"])
     def config_delete_keys():
         """Delete all stored keys from the credential manager."""

@@ -23,7 +23,7 @@ import ChatBubble from "../../components/debater/ChatBubble";
 import ChatInput from "../../components/debater/ChatInput";
 import useConfigStore from "../../store/configStore";
 import useDebaterStore, { VoiceState } from "./store";
-import { postChat, getDebateScore } from "./api";
+import { postChat, getDebateScore, getSessions, getSession } from "./api";
 
 export default function DebaterPage() {
   // ── Global config ──────────────────────────────────────────
@@ -62,17 +62,48 @@ export default function DebaterPage() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Ensure a session exists on mount
+  // Ensure a session exists on mount AND load sessions from backend
   useEffect(() => {
-    const ids = Object.keys(sessions);
-    if (ids.length === 0) {
-      createSession();
-    } else if (!currentSessionId || !sessions[currentSessionId]) {
-      const latest = ids.sort(
-        (a, b) => sessions[b].updatedAt - sessions[a].updatedAt
-      )[0];
-      setCurrentSessionId(latest);
-    }
+    // Load sessions list from backend
+    getSessions().then((data) => {
+      if (data.sessions && data.sessions.length > 0) {
+        // Load full session data for each
+        data.sessions.forEach((s) => {
+          getSession(s.session_id).then((full) => {
+            if (full.messages) {
+              // Restore to Zustand store
+              const sessionData = {
+                mode: full.mode || "debate",
+                messages: full.messages,
+                createdAt: full.created_at || Date.now(),
+                updatedAt: full.updated_at || Date.now(),
+              };
+              useDebaterStore.setState((state) => ({
+                sessions: { ...state.sessions, [s.session_id]: sessionData },
+              }));
+            }
+          }).catch(() => {});
+        });
+        // Set current session to latest
+        const latest = data.sessions.sort((a, b) => b.updated_at - a.updated_at)[0];
+        if (latest && latest.session_id) {
+          setCurrentSessionId(latest.session_id);
+        }
+      }
+    }).catch(() => {});
+
+    // If still no sessions in store, create one
+    setTimeout(() => {
+      const ids = Object.keys(useDebaterStore.getState().sessions);
+      if (ids.length === 0) {
+        createSession();
+      } else {
+        const latestId = ids.sort(
+          (a, b) => (sessions[b]?.updatedAt || 0) - (sessions[a]?.updatedAt || 0)
+        )[0];
+        if (latestId) setCurrentSessionId(latestId);
+      }
+    }, 500);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll to bottom on new messages

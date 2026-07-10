@@ -1,15 +1,9 @@
 /**
  * NovelPage — AI Novel Translator (DeepSeek-powered).
  *
- * Three-step workflow:
- *   1. Upload novel text + DeepSeek API Key
- *   2. Upload CET-4/6 vocabulary list
- *   3. View translated English output with highlighted vocab words
- *
- * State is persisted via Zustand — survives page navigation.
- * API key is read from global configStore and sent with every request.
+ * Loads translation history from backend on mount.
  */
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState } from "react";
 import ApiKeyInput from "../../components/ApiKeyInput";
 import NovelInput from "../../components/NovelInput";
 import VocabInput from "../../components/VocabInput";
@@ -17,7 +11,7 @@ import OutputDisplay from "../../components/OutputDisplay";
 import VocabStar from "../../components/vocab/VocabStar";
 import useConfigStore from "../../store/configStore";
 import useNovelStore from "./store";
-import { postTranslate } from "./api";
+import { postTranslate, getNovelSessions, getNovelSession } from "./api";
 
 export default function NovelPage() {
   // ── Global config ──────────────────────────────────────────
@@ -40,6 +34,35 @@ export default function NovelPage() {
   const setResult = useNovelStore((s) => s.setResult);
   const setLoading = useNovelStore((s) => s.setLoading);
   const setError = useNovelStore((s) => s.setError);
+
+  // ── History ──────────────────────────────────────────────────
+  const [historySessions, setHistorySessions] = useState([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Load translation history from backend on mount
+  useEffect(() => {
+    getNovelSessions()
+      .then((data) => {
+        if (data.sessions && data.sessions.length > 0) {
+          setHistorySessions(data.sessions);
+        }
+      })
+      .catch(() => {});
+  }, [result]); // refresh when a new translation completes
+
+  const loadHistorySession = (sessionId) => {
+    getNovelSession(sessionId).then((s) => {
+      if (s.messages) {
+        // Restore to view
+        const userMsg = s.messages.find((m) => m.role === "user");
+        const assistantMsg = s.messages.find((m) => m.role === "assistant");
+        if (userMsg) setNovelText(userMsg.content || "");
+        if (assistantMsg) {
+          setResult({ translated_text: assistantMsg.content, highlights: assistantMsg.highlights || [] });
+        }
+      }
+    }).catch(() => {});
+  };
 
   const doTranslate = useCallback(async () => {
     setError(null);
@@ -69,8 +92,29 @@ export default function NovelPage() {
         <p>CET-4/6 Exam Prep x Interest Reading</p>
       </header>
 
+      {/* ── Translation History ────────────────────────────── */}
+      {historySessions.length > 0 && (
+        <div style={{ marginBottom: 16 }}>
+          <button className="nes-btn" style={{ fontSize: "0.5rem" }}
+            onClick={() => setShowHistory(!showHistory)}>
+            📋 {showHistory ? "Hide" : "Show"} Translation History ({historySessions.length})
+          </button>
+          {showHistory && (
+            <div className="window" style={{ marginTop: 8, padding: "10px 14px" }}>
+              {historySessions.map((s) => (
+                <button key={s.session_id}
+                  className="nes-btn"
+                  style={{ fontSize: "0.45rem", margin: "3px 4px", display: "inline-block" }}
+                  onClick={() => loadHistorySession(s.session_id)}>
+                  📖 {s.preview?.slice(0, 40) || s.session_id?.slice(0, 8)}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <main className="novel-main">
-        {/* Window 1 — API Key + Novel Upload */}
         <div className="window window-col">
           <h3 className="window-title">Step 1 — Upload Novel</h3>
           <ApiKeyInput
@@ -84,8 +128,6 @@ export default function NovelPage() {
             setReady={setNovelReady}
           />
         </div>
-
-        {/* Window 2 — Vocabulary Upload */}
         <div className="window window-col">
           <VocabInput
             vocabText={vocabText}
@@ -94,11 +136,8 @@ export default function NovelPage() {
             setReady={setVocabReady}
           />
         </div>
-
-        {/* Window 3 — Output */}
         <div className="window window-col">
           <OutputDisplay result={result} loading={loading} error={error} />
-          {/* VocabStar for highlighted words in translation */}
           {result && result.highlights && result.highlights.length > 0 && (
             <div style={{ marginTop: 10, borderTop: "2px solid #3d1a60", paddingTop: 10 }}>
               <p style={{ fontSize: "0.45rem", color: "#50fa7b", fontFamily: "'Press Start 2P', monospace", marginBottom: 8 }}>

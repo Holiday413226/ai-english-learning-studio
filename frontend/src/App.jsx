@@ -1,15 +1,14 @@
 /**
  * App — root component.
  *
- * Six subsystems (Dashboard / Novel / Diary / Debater / Minecraft / Vocab Vault),
- * each with its own backend router and frontend module.
- *
- * On mount, restores API keys from the backend (keyring_store) into Zustand.
- * This ensures keys survive EXE restarts even when localStorage is cleared.
+ * On mount, restores API keys from backend (keyring_store → Zustand),
+ * then notifies SetupModal that keys are ready.
+ * Keys survive EXE restarts because they're stored in encrypted file.
  */
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Sidebar from "./components/Sidebar";
+import SetupModal from "./components/SetupModal";
 import DashboardPage from "./systems/dashboard/DashboardPage";
 import NovelPage from "./systems/novel/NovelPage";
 import DiaryPage from "./systems/diary/DiaryPage";
@@ -22,25 +21,66 @@ import "./App.css";
 export default function App() {
   const setConfig = useConfigStore((s) => s.setConfig);
   const cozeApiKey = useConfigStore((s) => s.cozeApiKey);
+  const deepseekApiKey = useConfigStore((s) => s.deepseekApiKey);
+  const [keysRestored, setKeysRestored] = useState(false);
+  const [showSetup, setShowSetup] = useState(false);
+  const [restoredKeys, setRestoredKeys] = useState({});
 
   // ── Restore keys from backend keyring_store on mount ──────
   useEffect(() => {
     // If Zustand already has keys (from localStorage), skip restore
-    if (cozeApiKey) return;
+    if (cozeApiKey || deepseekApiKey) {
+      setKeysRestored(true);
+      return;
+    }
 
-    fetch("/api/config/status")
+    // Fetch all keys from backend
+    fetch("/api/config/get")
       .then((r) => r.json())
-      .then((status) => {
-        // If any key is configured in backend, ask backend to give us the values
-        // We use a dedicated endpoint or just trust the status flags
-        if (Object.values(status).some(Boolean)) {
-          // Keys exist in backend — we need to fetch them
-          // For security, the backend only returns status (bool), not plaintext
-          // So we set a flag that tells SetupModal to show "keys configured" state
-          setConfig({ _backendHasKeys: true });
+      .then((keys) => {
+        if (keys.error) return;
+        // Check if any key has a value
+        const hasKeys = Object.values(keys).some((v) => v && v.length > 0);
+        if (hasKeys) {
+          // Restore to Zustand
+          setConfig({
+            deepseekApiKey: keys.deepseekApiKey || "",
+            cozeApiKey: keys.cozeApiKey || "",
+            debateBotId: keys.debateBotId || "",
+            discussBotId: keys.discussBotId || "",
+            minecraftBotId: keys.minecraftBotId || "",
+          });
+          setRestoredKeys(keys);
+        } else {
+          // No keys configured — show SetupModal on first launch
+          setShowSetup(true);
         }
+        setKeysRestored(true);
       })
-      .catch(() => {}); // backend not ready yet — that's ok
+      .catch(() => {
+        // Backend not ready yet — retry in 2s
+        setTimeout(() => {
+          fetch("/api/config/get")
+            .then((r) => r.json())
+            .then((keys) => {
+              if (keys.error) { setShowSetup(true); setKeysRestored(true); return; }
+              const hasKeys = Object.values(keys).some((v) => v && v.length > 0);
+              if (hasKeys) {
+                setConfig({
+                  deepseekApiKey: keys.deepseekApiKey || "",
+                  cozeApiKey: keys.cozeApiKey || "",
+                  debateBotId: keys.debateBotId || "",
+                  discussBotId: keys.discussBotId || "",
+                  minecraftBotId: keys.minecraftBotId || "",
+                });
+              } else {
+                setShowSetup(true);
+              }
+              setKeysRestored(true);
+            })
+            .catch(() => { setShowSetup(true); setKeysRestored(true); });
+        }, 2000);
+      });
   }, []); // only on mount
 
   // On tab/window close: tell the backend to shut down (EXE mode).
@@ -67,6 +107,14 @@ export default function App() {
           </Routes>
         </div>
       </div>
+      {/* SetupModal — auto-opens on first launch when no keys configured */}
+      {keysRestored && (
+        <SetupModal
+          open={showSetup}
+          onClose={() => setShowSetup(false)}
+          restoredKeys={restoredKeys}
+        />
+      )}
     </BrowserRouter>
   );
 }

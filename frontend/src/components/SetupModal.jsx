@@ -25,7 +25,7 @@ const KEY_MAP = {
   minecraftBotId: "minecraft_bot_id",
 };
 
-export default function SetupModal({ open, onClose }) {
+export default function SetupModal({ open, onClose, restoredKeys }) {
   const config = useConfigStore();
 
   const [cozeApiKey, setCozeApiKey] = useState(config.cozeApiKey);
@@ -49,12 +49,13 @@ export default function SetupModal({ open, onClose }) {
   // Reset local state every time the modal opens
   useEffect(() => {
     if (open) {
-      setCozeApiKey(config.cozeApiKey);
+      // Prefer restored keys from backend, fall back to Zustand
+      setCozeApiKey(restoredKeys?.cozeApiKey || config.cozeApiKey);
       setCozeApiUrl(config.cozeApiUrl);
-      setDeepseekApiKey(config.deepseekApiKey);
-      setDebateBotId(config.debateBotId);
-      setDiscussBotId(config.discussBotId);
-      setMinecraftBotId(config.minecraftBotId);
+      setDeepseekApiKey(restoredKeys?.deepseekApiKey || config.deepseekApiKey);
+      setDebateBotId(restoredKeys?.debateBotId || config.debateBotId);
+      setDiscussBotId(restoredKeys?.discussBotId || config.discussBotId);
+      setMinecraftBotId(restoredKeys?.minecraftBotId || config.minecraftBotId);
       setSaveError(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
