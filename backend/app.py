@@ -56,10 +56,14 @@ def create_app() -> Flask:
     from systems.novel.router import register_novel_routes
     from systems.debater.router import register_debater_routes
     from systems.minecraft.router import register_minecraft_routes
+    from systems.diary.router import register_diary_routes
+    from systems.vocab.router import register_vocab_routes
 
     register_novel_routes(app)
     register_debater_routes(app)
     register_minecraft_routes(app)
+    register_diary_routes(app)
+    register_vocab_routes(app)
 
     # ── Config / Keyring routes ─────────────────────────────────
     from systems.config.keyring_store import set_key, get_key, get_status, delete_all_keys
@@ -92,14 +96,6 @@ def create_app() -> Flask:
         """Delete all stored keys from the credential manager."""
         delete_all_keys()
         return jsonify({"status": "cleared"})
-
-    # ── Vocab Vault routes ─────────────────────────────────────
-    from systems.vocab.router import register_vocab_routes
-    register_vocab_routes(app)
-
-    # ── Diary routes ────────────────────────────────────────────
-    from systems.diary.router import register_diary_routes
-    register_diary_routes(app)
 
     # ── Dashboard stats ─────────────────────────────────────────
     @app.route("/api/dashboard/stats", methods=["GET"])

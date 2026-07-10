@@ -236,6 +236,7 @@ export default function DebaterPage() {
                   key={`${msg.timestamp}-${i}`}
                   message={msg}
                   isTyping={isLastAI && loading}
+                  apiKey={deepseekApiKey}
                 />
               );
             })}

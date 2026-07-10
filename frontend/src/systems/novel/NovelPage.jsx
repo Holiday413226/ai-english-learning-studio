@@ -14,6 +14,7 @@ import ApiKeyInput from "../../components/ApiKeyInput";
 import NovelInput from "../../components/NovelInput";
 import VocabInput from "../../components/VocabInput";
 import OutputDisplay from "../../components/OutputDisplay";
+import VocabStar from "../../components/vocab/VocabStar";
 import useConfigStore from "../../store/configStore";
 import useNovelStore from "./store";
 import { postTranslate } from "./api";
@@ -97,6 +98,28 @@ export default function NovelPage() {
         {/* Window 3 — Output */}
         <div className="window window-col">
           <OutputDisplay result={result} loading={loading} error={error} />
+          {/* VocabStar for highlighted words in translation */}
+          {result && result.highlights && result.highlights.length > 0 && (
+            <div style={{ marginTop: 10, borderTop: "2px solid #3d1a60", paddingTop: 10 }}>
+              <p style={{ fontSize: "0.45rem", color: "#50fa7b", fontFamily: "'Press Start 2P', monospace", marginBottom: 8 }}>
+                ⭐ Save highlighted words to Vocab Vault
+              </p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {result.highlights.map((h, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 4,
+                    background: "#0d001a", border: "1px solid #3d1a60", padding: "4px 8px", borderRadius: 4 }}>
+                    <span style={{ fontSize: "0.5rem", color: "#87ceeb" }}>{h.word}</span>
+                    <VocabStar
+                      word={h.word}
+                      context={result.translated_text?.slice(Math.max(0, h.start - 20), h.end + 50) || ""}
+                      sourceModule="novel"
+                      apiKey={deepseekApiKey}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </main>
     </div>
