@@ -3,13 +3,47 @@ name: Build and Release
 on:
   push:
     tags:
-      - '**'          # matches ANY tag, including Chinese
+      - '**'
+  pull_request:
+    branches: [master, Mineflayer实验]
 
 permissions:
   contents: write
 
 jobs:
+  # ── Unit Tests (runs on every PR and tag) ──────────────────
+  unit-test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest
+
+      - name: Run tests
+        run: |
+          cd backend
+          python -m pytest ../tests/ -v --junitxml=../report.xml
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: report.xml
+
+  # ── Build EXE (runs on tags only) ──────────────────────────
   build:
+    needs: unit-test
     runs-on: windows-latest
 
     steps:
@@ -39,12 +73,11 @@ jobs:
           Copy-Item -Recurse -Force frontend\dist\* backend\static\
           Write-Host "Frontend dist copied to backend/static/"
 
-      # ── Source ZIP (always works, no Python/PyInstaller needed) ──
+      # ── Source ZIP (always works) ───────────────────────────
       - name: Package source ZIP
         shell: pwsh
         run: |
-          # Include: backend (with static/) + frontend source
-          $name = "AI-Novel-Translator-src.zip"
+          $name = "AI-English-Learning-Studio-v2.0.0-src.zip"
           Compress-Archive -Path backend, frontend -DestinationPath $name
           Write-Host "Source ZIP: $((Get-Item $name).Length) bytes"
           echo "SRC_ZIP=$name" >> $env:GITHUB_ENV
@@ -65,16 +98,16 @@ jobs:
         id: pyinstaller
         run: |
           cd backend
-          pyinstaller --onedir --add-data "static;static" --name "AI-Novel-Translator" --noconsole app.py
-          Write-Host "EXE built in backend/dist/AI-Novel-Translator/"
-        continue-on-error: true   # EXE is optional — ZIP is the guaranteed artifact
+          pyinstaller --onefile --windowed --add-data "static;static" --hidden-import webview --name "AIEnglishStudio" app.py
+          Write-Host "EXE built in backend/dist/AIEnglishStudio.exe"
+        continue-on-error: true
 
       - name: Package EXE ZIP
         if: steps.pyinstaller.outcome == 'success'
         shell: pwsh
         run: |
-          $name = "AI-Novel-Translator-Windows.zip"
-          Compress-Archive -Path backend\dist\AI-Novel-Translator\* -DestinationPath $name
+          $name = "AIEnglishStudio-Windows.zip"
+          Compress-Archive -Path backend\dist\AIEnglishStudio.exe -DestinationPath $name
           Write-Host "EXE ZIP: $((Get-Item $name).Length) bytes"
           echo "EXE_ZIP=$name" >> $env:GITHUB_ENV
 
