@@ -40,20 +40,47 @@ _lock = threading.Lock()
 
 
 def _get_key_dir():
-    """Persistent writable directory outside the EXE temp dir."""
+    """Persistent writable directory outside the EXE temp dir.
+
+    Always prefers ~/.ai_english_studio/ for consistency across
+    dev mode and EXE mode.  The EXE-relative path is checked only
+    as a migration source — new writes always go to the home dir.
+    """
     global _KEY_FILE_DIR
     if _KEY_FILE_DIR:
         return _KEY_FILE_DIR
 
-    # Prefer a user-visible directory that survives EXE restarts.
+    # Primary location — same for dev and EXE, survives reboots and EXE moves.
+    primary = os.path.join(os.path.expanduser("~"), ".ai_english_studio")
+
+    # Migration source — old EXE builds stored keys alongside the EXE.
+    exe_dir = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else None
+    legacy_dir = os.path.join(exe_dir, "data", "config") if exe_dir else None
+
+    # Try primary first
+    try:
+        os.makedirs(primary, exist_ok=True)
+        _KEY_FILE_DIR = primary
+        # Migrate keys from legacy EXE-relative location if present
+        if legacy_dir and os.path.isdir(legacy_dir):
+            legacy_file = os.path.join(legacy_dir, "keys.enc")
+            primary_file = os.path.join(primary, "keys.enc")
+            if os.path.exists(legacy_file) and not os.path.exists(primary_file):
+                try:
+                    import shutil
+                    shutil.copy2(legacy_file, primary_file)
+                except OSError:
+                    pass
+        return primary
+    except OSError:
+        pass
+
+    # Fallback candidates
     candidates = [
-        os.path.join(os.path.expanduser("~"), ".ai_english_studio"),
         os.path.join(os.environ.get("APPDATA", ""), "AIEnglishStudio"),
     ]
-    # In EXE mode, data/ alongside sys.executable is persistent
-    exe_dir = os.path.dirname(sys.executable) if getattr(sys, "frozen", False) else None
-    if exe_dir:
-        candidates.insert(0, os.path.join(exe_dir, "data", "config"))
+    if legacy_dir:
+        candidates.append(legacy_dir)
 
     for d in candidates:
         try:
@@ -192,16 +219,16 @@ def set_key(key_name: str, value: str) -> None:
 
 
 def get_key(key_name: str) -> str | None:
-    """Retrieve a key. Tries keyring first, then encrypted file."""
-    # Try keyring first
-    val = _try_keyring_get(key_name)
+    """Retrieve a key. Encrypted file first (most reliable), then keyring."""
+    # Encrypted file is the primary source — works in both dev and EXE
+    data = _file_read_all()
+    val = data.get(key_name, "")
     if val and val.strip():
         return val
 
-    # Fall back to encrypted file
-    data = _file_read_all()
-    val = data.get(key_name, "")
-    return val if val else None
+    # Fall back to keyring (best effort)
+    val = _try_keyring_get(key_name)
+    return val if val and val.strip() else None
 
 
 def get_status() -> dict[str, bool]:

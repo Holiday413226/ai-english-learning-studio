@@ -72,3 +72,21 @@ export async function getCompanionSession(sessionId) {
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   return resp.json();
 }
+
+// ── Bridge control endpoints ────────────────────────────────────
+
+export async function getBridgeStatus() {
+  const resp = await fetch(`${API_BASE}/bridge/status`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
+export async function startMinebotBridge() {
+  const resp = await fetch(`${API_BASE}/bridge/start`, { method: "POST" });
+  return resp.json();
+}
+
+export async function stopMinebotBridge() {
+  const resp = await fetch(`${API_BASE}/bridge/stop`, { method: "POST" });
+  return resp.json();
+}

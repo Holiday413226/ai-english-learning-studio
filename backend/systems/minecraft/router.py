@@ -15,6 +15,7 @@ POST   /api/minecraft/companion/refresh   — trigger session scan from disk
 from flask import request, jsonify
 from core.coze_client import chat_with_bot
 from systems.minecraft.session_storage import minecraft_storage
+from systems.minecraft.bridge import MinebotBridge
 
 
 def register_minecraft_routes(app):
@@ -169,3 +170,37 @@ def register_minecraft_routes(app):
         """
         count = minecraft_storage.scan_sessions()
         return jsonify({"status": "ok", "sessions_found": count})
+
+    # ── Bridge control endpoints ────────────────────────────────────
+
+    @app.route("/api/minecraft/bridge/start", methods=["POST"])
+    def bridge_start():
+        """Launch the external Mindcraft process.
+
+        POST /api/minecraft/bridge/start
+        → {status: "ok"|"already_running"|"error", message: str}
+        """
+        bridge: MinebotBridge = app.minebot_bridge
+        result = bridge.start()
+        return jsonify(result)
+
+    @app.route("/api/minecraft/bridge/stop", methods=["POST"])
+    def bridge_stop():
+        """Stop the external Mindcraft process.
+
+        POST /api/minecraft/bridge/stop
+        → {status: "ok"|"not_running", message: str}
+        """
+        bridge: MinebotBridge = app.minebot_bridge
+        result = bridge.stop()
+        return jsonify(result)
+
+    @app.route("/api/minecraft/bridge/status", methods=["GET"])
+    def bridge_status():
+        """Return bridge runtime status.
+
+        GET /api/minecraft/bridge/status
+        → {minecraft_running: bool}
+        """
+        bridge: MinebotBridge = app.minebot_bridge
+        return jsonify(bridge.get_status())

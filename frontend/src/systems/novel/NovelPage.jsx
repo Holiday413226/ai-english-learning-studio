@@ -45,6 +45,7 @@ export default function NovelPage() {
       .then((data) => {
         if (data.sessions && data.sessions.length > 0) {
           setHistorySessions(data.sessions);
+          setShowHistory(true);  // Auto-show history when sessions exist
         }
       })
       .catch(() => {});

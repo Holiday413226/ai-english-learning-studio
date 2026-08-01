@@ -60,12 +60,13 @@ def register_novel_routes(app):
                 ), 402
             return jsonify({"error": f"Translation failed: {error_msg}"}), 500
 
-        # Optionally save to session history
-        if session_id:
-            novel_storage.add_message(session_id, "user", novel_text[:500])
-            novel_storage.add_message(session_id, "assistant", result.get("translated_text", "")[:500])
+        # Always save to session history for persistence
+        if not session_id:
+            session_id = novel_storage.create()
+        novel_storage.add_message(session_id, "user", novel_text[:500])
+        novel_storage.add_message(session_id, "assistant", result.get("translated_text", "")[:500])
 
-        result["session_id"] = session_id or novel_storage.create()
+        result["session_id"] = session_id
         return jsonify(result)
 
     @app.route("/api/novel/define", methods=["GET"])

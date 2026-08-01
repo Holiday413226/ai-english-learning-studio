@@ -79,11 +79,17 @@ class NovelSessionStorage:
             try:
                 with open(f, "r", encoding="utf-8") as fh:
                     data = json.load(fh)
+                preview = "New Translation"
+                for m in data.get("messages", []):
+                    if m.get("role") == "user":
+                        preview = m["content"][:60]
+                        break
                 result.append({
                     "session_id": data.get("session_id", f.stem.replace("session_", "")),
                     "message_count": len(data.get("messages", [])),
                     "created_at": data.get("created_at", 0),
                     "updated_at": data.get("updated_at", 0),
+                    "preview": preview,
                 })
             except (json.JSONDecodeError, IOError):
                 pass

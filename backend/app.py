@@ -28,6 +28,7 @@ import sys
 import time
 import mimetypes
 import threading
+import webbrowser
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify, send_from_directory
@@ -64,6 +65,10 @@ def create_app() -> Flask:
     register_minecraft_routes(app)
     register_diary_routes(app)
     register_vocab_routes(app)
+
+    # ── Minebot bridge (process lifecycle for external Mindcraft) ──
+    from systems.minecraft.bridge import MinebotBridge
+    app.minebot_bridge = MinebotBridge()
 
     # ── Config / Keyring routes ─────────────────────────────────
     from systems.config.keyring_store import set_key, get_key, get_status, delete_all_keys
@@ -349,3 +354,5 @@ if __name__ == "__main__":
             app.run(debug=False, host=FLASK_HOST, port=FLASK_PORT, use_reloader=False)
         except KeyboardInterrupt:
             pass
+        finally:
+            app.minebot_bridge.stop()

@@ -8,7 +8,8 @@
 import { useState, useEffect, useCallback } from "react";
 import useConfigStore from "../../store/configStore";
 import VocabStar from "../../components/vocab/VocabStar";
-import { getCompanionStatus, getCompanionSessions, getCompanionSession } from "./api";
+import { getCompanionStatus, getCompanionSessions, getCompanionSession,
+         getBridgeStatus, startMinebotBridge, stopMinebotBridge } from "./api";
 
 export default function MinecraftPage() {
   const deepseekApiKey = useConfigStore((s) => s.deepseekApiKey);
@@ -21,16 +22,23 @@ export default function MinecraftPage() {
   const [error, setError] = useState(null);
   const [lastRefresh, setLastRefresh] = useState(null);
 
+  // Bridge state
+  const [bridgeStatus, setBridgeStatus] = useState(null);
+  const [starting, setStarting] = useState(false);
+  const [stopping, setStopping] = useState(false);
+
   const refresh = useCallback(async () => {
     setError(null);
     setLoading(true);
     try {
-      const [st, ss] = await Promise.all([
+      const [st, ss, bs] = await Promise.all([
         getCompanionStatus(),
         getCompanionSessions(),
+        getBridgeStatus(),
       ]);
       setStatus(st);
       setSessions(ss.sessions || []);
+      setBridgeStatus(bs);
       setLastRefresh(new Date().toLocaleTimeString());
     } catch (err) {
       setError(err.message);
@@ -57,6 +65,35 @@ export default function MinecraftPage() {
     }
   };
 
+  const startMinebot = async () => {
+    setError(null);
+    setStarting(true);
+    try {
+      const result = await startMinebotBridge();
+      if (result.status === "error") {
+        setError(result.message);
+      }
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setStarting(false);
+    }
+  };
+
+  const stopMinebot = async () => {
+    setError(null);
+    setStopping(true);
+    try {
+      await stopMinebotBridge();
+      await refresh();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setStopping(false);
+    }
+  };
+
   return (
     <div className="page-content">
       <header>
@@ -79,6 +116,33 @@ export default function MinecraftPage() {
               <div style={{ fontSize: "0.4rem", color: "#6a5a8a", marginTop: 2 }}>
                 {status.bot_name}
               </div>
+            )}
+
+            {/* Minebot process control */}
+            <div style={{ fontSize: "0.4rem", color: "#9b8ab8", marginTop: 8 }}>
+              MindServer:{" "}
+              <span style={{ color: bridgeStatus?.minebot_running ? "#50fa7b" : "#ff6b8a" }}>
+                {bridgeStatus?.minebot_running ? "RUNNING" : "STOPPED"}
+              </span>
+            </div>
+            {!bridgeStatus?.minebot_running ? (
+              <button
+                className="nes-btn is-success"
+                style={{ fontSize: "0.4rem", width: "100%", padding: "6px", marginTop: 6 }}
+                onClick={startMinebot}
+                disabled={starting}
+              >
+                {starting ? "Starting..." : "Start Minebot"}
+              </button>
+            ) : (
+              <button
+                className="nes-btn is-error"
+                style={{ fontSize: "0.4rem", width: "100%", padding: "6px", marginTop: 6 }}
+                onClick={stopMinebot}
+                disabled={stopping}
+              >
+                {stopping ? "Stopping..." : "Stop Minebot"}
+              </button>
             )}
           </div>
 

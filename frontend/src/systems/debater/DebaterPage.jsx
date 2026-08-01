@@ -64,46 +64,75 @@ export default function DebaterPage() {
 
   // Ensure a session exists on mount AND load sessions from backend
   useEffect(() => {
-    // Load sessions list from backend
-    getSessions().then((data) => {
-      if (data.sessions && data.sessions.length > 0) {
-        // Load full session data for each
-        data.sessions.forEach((s) => {
-          getSession(s.session_id).then((full) => {
-            if (full.messages) {
-              // Restore to Zustand store
-              const sessionData = {
-                mode: full.mode || "debate",
-                messages: full.messages,
-                createdAt: full.created_at || Date.now(),
-                updatedAt: full.updated_at || Date.now(),
-              };
-              useDebaterStore.setState((state) => ({
-                sessions: { ...state.sessions, [s.session_id]: sessionData },
-              }));
+    let cancelled = false;
+
+    async function loadSessions() {
+      try {
+        const data = await getSessions();
+        if (cancelled) return;
+
+        if (data.sessions && data.sessions.length > 0) {
+          // Load all sessions in parallel
+          await Promise.all(data.sessions.map(async (s) => {
+            try {
+              const full = await getSession(s.session_id);
+              if (full.messages && !cancelled) {
+                useDebaterStore.setState((state) => ({
+                  sessions: {
+                    ...state.sessions,
+                    [s.session_id]: {
+                      mode: full.mode || "debate",
+                      messages: full.messages,
+                      createdAt: full.created_at || Date.now(),
+                      updatedAt: full.updated_at || Date.now(),
+                    },
+                  },
+                }));
+              }
+            } catch {
+              // skip sessions that fail to load
             }
-          }).catch(() => {});
-        });
-        // Set current session to latest
-        const latest = data.sessions.sort((a, b) => b.updated_at - a.updated_at)[0];
-        if (latest && latest.session_id) {
-          setCurrentSessionId(latest.session_id);
+          }));
+
+          if (!cancelled) {
+            // Set current session to latest
+            const latest = data.sessions.sort((a, b) => b.updated_at - a.updated_at)[0];
+            if (latest?.session_id) {
+              setCurrentSessionId(latest.session_id);
+            }
+          }
+        }
+
+        // After all backend data is loaded, create a new session only if truly empty
+        if (!cancelled) {
+          const ids = Object.keys(useDebaterStore.getState().sessions);
+          if (ids.length === 0) {
+            createSession();
+          } else {
+            // Ensure currentSessionId is set to the latest
+            const currentState = useDebaterStore.getState();
+            const latestId = Object.keys(currentState.sessions).sort(
+              (a, b) => (currentState.sessions[b]?.updatedAt || 0) - (currentState.sessions[a]?.updatedAt || 0)
+            )[0];
+            if (latestId && !currentState.currentSessionId) {
+              setCurrentSessionId(latestId);
+            }
+          }
+        }
+      } catch {
+        // Backend unavailable — create a local session
+        if (!cancelled) {
+          const ids = Object.keys(useDebaterStore.getState().sessions);
+          if (ids.length === 0) {
+            createSession();
+          }
         }
       }
-    }).catch(() => {});
+    }
 
-    // If still no sessions in store, create one
-    setTimeout(() => {
-      const ids = Object.keys(useDebaterStore.getState().sessions);
-      if (ids.length === 0) {
-        createSession();
-      } else {
-        const latestId = ids.sort(
-          (a, b) => (sessions[b]?.updatedAt || 0) - (sessions[a]?.updatedAt || 0)
-        )[0];
-        if (latestId) setCurrentSessionId(latestId);
-      }
-    }, 500);
+    loadSessions();
+
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-scroll to bottom on new messages
