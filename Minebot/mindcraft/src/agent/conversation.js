@@ -78,7 +78,10 @@ class ConversationManager {
             if (this.awaiting_response && agent.isIdle()) {
                 wait_time += delta;
                 if (wait_time > this.wait_time_limit) {
-                    agent.handleMessage('system', `${convo_partner} hasn't responded in ${this.wait_time_limit/1000} seconds, respond with a message to them or your own action.`);
+                    agent.llmGate.run(
+                        () => agent.handleMessage('system', `${convo_partner} hasn't responded in ${this.wait_time_limit/1000} seconds, respond with a message to them or your own action.`),
+                        { throttled: true }
+                    ).catch(() => {});
                     wait_time = 0;
                     this.wait_time_limit*=2;
                 }
@@ -96,7 +99,9 @@ class ConversationManager {
                     }
                     if (!agent.self_prompter.isPaused()) {
                         this.endConversation(convo_partner);
-                        agent.handleMessage('system', `${convo_partner} disconnected, conversation has ended.`);
+                        agent.llmGate.run(
+                            () => agent.handleMessage('system', `${convo_partner} disconnected, conversation has ended.`)
+                        ).catch(() => {});
                     }
                     else {
                         this.endConversation(convo_partner);
@@ -337,7 +342,9 @@ function _handleFullInMessage(sender, received) {
     else if (received.start)
         agent.shut_up = false;
     convo.inMessageTimer = null;
-    agent.handleMessage(sender, message);
+    agent.llmGate.run(
+        () => agent.handleMessage(sender, message)
+    ).catch(() => {});
 }
 
 

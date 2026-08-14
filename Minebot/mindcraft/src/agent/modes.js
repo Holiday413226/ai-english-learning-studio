@@ -172,7 +172,7 @@ const modes_list = [
     {
         name: 'hunting',
         description: 'Hunt nearby animals when idle.',
-        interrupts: ['action:followPlayer'],
+        interrupts: [], // V5-FIX: no longer interrupts followPlayer — player commands have priority
         on: true,
         active: false,
         update: async function (agent) {
@@ -188,7 +188,7 @@ const modes_list = [
     {
         name: 'item_collecting',
         description: 'Collect nearby items when idle.',
-        interrupts: ['action:followPlayer'],
+        interrupts: [], // V5-FIX: no longer interrupts followPlayer — player commands have priority
         on: true,
         active: false,
 
@@ -219,7 +219,7 @@ const modes_list = [
     {
         name: 'torch_placing',
         description: 'Place torches when idle and there are no torches nearby.',
-        interrupts: ['action:followPlayer'],
+        interrupts: [], // V5-FIX: no longer interrupts followPlayer — player commands have priority
         on: true,
         active: false,
         cooldown: 5,
@@ -238,7 +238,7 @@ const modes_list = [
     {
         name: 'elbow_room',
         description: 'Move away from nearby players when idle.',
-        interrupts: ['action:followPlayer'],
+        interrupts: [], // V5-FIX: no longer interrupts followPlayer — player commands have priority
         on: true,
         active: false,
         distance: 0.5,
@@ -324,8 +324,11 @@ async function execute(mode, agent, func, timeout=-1) {
         // auto prompt to respond to the interruption
         let role = convoManager.inConversation() ? agent.last_sender : 'system';
         let logs = agent.bot.modes.flushBehaviorLog();
-        agent.handleMessage(role, `(AUTO MESSAGE)Your previous action '${interrupted_action}' was interrupted by ${mode.name}.
-        Your behavior log: ${logs}\nRespond accordingly.`);
+        agent.llmGate.run(
+            () => agent.handleMessage(role, `(AUTO MESSAGE)Your previous action '${interrupted_action}' was interrupted by ${mode.name}.
+        Your behavior log: ${logs}\nRespond accordingly.`),
+            { throttled: true }
+        ).catch(() => {});
     }
 }
 

@@ -1,6 +1,7 @@
 import { writeFileSync, readFileSync, mkdirSync, existsSync } from 'fs';
 import { NPCData } from './npc/data.js';
 import settings from './settings.js';
+import { savePersona, saveWorldMemory } from './persona_store.js';
 
 
 export class History {
@@ -40,6 +41,47 @@ export class History {
         }
 
         console.log("Memory updated to: ", this.memory);
+
+        // ═══ Persona Memory Write — driven by plan.memory_write (not policy) ═══
+        // Routes to globalMemory (cross-world core experiences) or
+        // worldMemory (world-specific events) based on plan type.
+        const activePlan = this.agent.persona?.activeBehavior?.plan;
+        if (this.agent.persona && activePlan?.memory_write) {
+            const dateTag = new Date().toISOString().slice(0, 10);
+            const turnSnippets = turns
+                .map(t => String(t.content || '').slice(0, 150))
+                .filter(Boolean)
+                .join(' | ');
+            const entry = `\n[${dateTag}] ${activePlan.primary_action}: ${turnSnippets}`;
+
+            // ── Route: core experiences → globalMemory; world events → worldMemory ──
+            const worldId = this.agent.currentWorldId || 'default';
+            const isCoreExperience = ['mourn', 'engage', 'avoid'].includes(
+                this.agent.persona.activeBehavior?.intent?.type
+            );
+
+            if (isCoreExperience) {
+                // Core persona-shaping events → global (cross-world)
+                this.agent.persona.globalMemory += entry;
+                if (this.agent.persona.globalMemory.length > 2000) {
+                    this.agent.persona.globalMemory =
+                        '...(older)\n' + this.agent.persona.globalMemory.slice(-1500);
+                }
+            } else {
+                // World-specific events → per-world
+                const existing = this.agent.persona.getWorldMemory(worldId);
+                this.agent.persona.setWorldMemory(worldId, existing + entry);
+                const current = this.agent.persona.getWorldMemory(worldId);
+                if (current.length > 2000) {
+                    this.agent.persona.setWorldMemory(worldId,
+                        '...(older)\n' + current.slice(-1500));
+                }
+                saveWorldMemory(this.agent.persona.id, worldId,
+                    this.agent.persona.getWorldMemory(worldId));
+            }
+
+            savePersona(this.agent.persona);
+        }
     }
 
     async appendFullHistory(to_store) {

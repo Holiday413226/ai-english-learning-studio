@@ -182,6 +182,22 @@ export class EventDetector {
         const bot = this.bot;
         if (!bot || !bot.entity) return [];
 
+        // [TRACE] Log Minecraft real state at each scan
+        try {
+            const pos = world.getPosition(bot);
+            const snapshot = this.agent.vision_perception?.getLatest();
+            console.log('[TRACE:MC_STATE]', JSON.stringify({
+                biome: this._prevBiome,
+                weather: this._prevWeather,
+                skyLight: this._prevSkyLight,
+                pos: pos ? {x:Number(pos.x.toFixed(1)),y:Number(pos.y.toFixed(1)),z:Number(pos.z.toFixed(1))} : null,
+                timeOfDay: bot.time?.timeOfDay,
+                health: bot.health,
+                labels: snapshot?.labels?.slice(0,8) || [],
+                entities: snapshot?.raw?.entities?.slice(0,5) || [],
+            }));
+        } catch(e) { /* trace only */ }
+
         // --- Biome change ---
         try {
             const biome = world.getBiomeName(bot);
@@ -313,6 +329,16 @@ export class EventDetector {
                 }
             }
         } catch (_) { /* ignore */ }
+
+        // [TRACE] Log produced observations
+        if (observations.length > 0) {
+            console.log('[TRACE:DETECTOR_EVENTS]', JSON.stringify(observations.map(o => ({
+                type: o.type,
+                route: o.route,
+                event_id: o.event_id,
+                data_keys: Object.keys(o.data||{}),
+            }))));
+        }
 
         this._initialised = true;
         return observations;

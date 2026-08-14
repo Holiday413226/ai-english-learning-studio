@@ -20,6 +20,7 @@ import { EventDetector } from './event_detector.js';
 import { NoveltyTracker } from './novelty_tracker.js';
 import { CompanionBehaviorHook } from './companion_behavior.js';
 import { AutoSpeechTrigger } from './auto_speech_trigger.js';
+import { WorldStateManager } from './world_state.js';
 
 // ---------------------------------------------------------------------------
 // Default configuration
@@ -76,6 +77,9 @@ export class Observer {
         this.companion = new CompanionBehaviorHook(agent);
         this.mood = new MoodProvider();
         this.autoSpeech = new AutoSpeechTrigger();
+
+        // V5: World State Manager — ground-truth state layer
+        this.worldState = new WorldStateManager();
 
         // ---- Observation queues ----
         /** @type {object[]}  Observations waiting for context injection. */
@@ -205,6 +209,12 @@ export class Observer {
         // Build context string (includes ALL observations — consumed or not)
         const context = this._formatQueueContext();
         if (context) {
+            // [TRACE] Log context injected on player message
+            console.log('[TRACE:INJECT_CONTEXT]', JSON.stringify({
+                trigger: 'player_message',
+                queue_size: this.active_queue.length,
+                context: context,
+            }));
             this.agent.history.add('system', context);
         }
 
@@ -237,8 +247,23 @@ export class Observer {
     // ------------------------------------------------------------------
 
     _enqueue(obs) {
+        // ═══ Persona Attention Filter — discard events the persona doesn't care about ═══
+        if (this.agent.persona && !this.agent.persona.shouldAttend(obs)) {
+            return;
+        }
+
         // V3: compute attention score and force_expression flag
         this.autoSpeech.computeAttentionScore(obs);
+
+        // [TRACE] Log each enqueued observation with its attention metadata
+        console.log('[TRACE:ENQUEUE]', JSON.stringify({
+            type: obs.type,
+            event_id: obs.event_id,
+            attention_score: obs.attention_score,
+            force_expression: obs.force_expression,
+            consumed: obs.consumed,
+            data_snippet: JSON.stringify(obs.data||{}).slice(0,120),
+        }));
 
         // Dedup by event_id within this session
         if (obs.event_id && this._seenEventIds.has(obs.event_id)) return;
@@ -265,6 +290,12 @@ export class Observer {
 
         // Notify companion behaviours
         this.companion.notifyObservation(obs);
+
+        // V5: Feed to World State Manager (ground truth)
+        this.worldState.factStore.add(obs);
+
+        // ═══ Persona Drift — subtle trait evolution from experience ═══
+        this.agent.persona?.drift(obs);
     }
 
     // ------------------------------------------------------------------
@@ -325,7 +356,11 @@ export class Observer {
                 ? ` [mood: ${obs.mood_tags.join(', ')}]`
                 : '';
 
-            lines.push(`- ${desc} (${ageStr})${moodStr}`);
+            // V5: tag with fact level and scope annotation
+            const tag = this.worldState.realityGuard.formatFactTag(obs);
+            const scope = this.worldState.realityGuard.getScopeAnnotation(obs);
+            const scopeStr = scope ? ` | ${scope}` : '';
+            lines.push(`- ${tag} ${desc} (${ageStr})${scopeStr}${moodStr}`);
         }
 
         if (lines.length === 0) return null;
@@ -355,9 +390,27 @@ export class Observer {
         // L1/L2 check — force_expression OR ≥0.8 OR threat
         if (!this.autoSpeech.hasReflexTrigger(this.active_queue, this.agent)) return;
 
+        // ═══ Persona Behavior Pipeline — intent + plan before LLM ═══
+        // Persona may decide to ignore even high-attention events (e.g. cautious persona)
+        if (this.agent.persona) {
+            const { intent, plan } = this.agent.persona.generateBehavior(
+                { type: 'threat_nearby', attention_score: 0.8 }, { threat: true }
+            );
+            if (plan.primary_action === 'ignore') return;
+            this.agent.persona.setActiveBehavior(intent, plan);
+        }
+
         // Build prompt from unconsumed high-attention observations
         const prompt = this.autoSpeech.buildPrompt(this.active_queue);
         if (!prompt) return;
+
+        // [TRACE] Reflex trigger FIRING
+        console.log('[TRACE:REFLEX_FIRE]', JSON.stringify({
+            trigger: 'L1/L2 Reflex',
+            queue_size: this.active_queue.length,
+            queue_items: this.active_queue.map(o => ({type:o.type, score:o.attention_score, consumed:o.consumed, force:o.force_expression})),
+            prompt_preview: prompt.slice(0, 300),
+        }));
 
         // Mark consumed BEFORE fire-and-forget (prevents re-trigger in same tick)
         this._lastProactiveExpression = now;
@@ -365,7 +418,10 @@ export class Observer {
 
         // Fire-and-forget — handleMessage will call injectQueueToHistory,
         // which calls shouldBoost() (not hasReflexTrigger) → won't double-boost
-        this.agent.handleMessage('system', prompt, 1).catch(() => {});
+        this.agent.llmGate.run(
+            () => this.agent.handleMessage('system', prompt, 1),
+            { throttled: true, dedupKey: this.agent.llmGate.hashKey('reflex', prompt) }
+        ).catch(() => {});
     }
 
     // ------------------------------------------------------------------
@@ -396,9 +452,32 @@ export class Observer {
         const prompt = this.autoSpeech.buildPrompt(this.active_queue);
         if (!prompt) return;
 
+        // [TRACE] Attention trigger FIRING
+        const totalScore = this.autoSpeech._getUsable(this.active_queue)
+            .reduce((s,o) => s + (o.attention_score||0), 0);
+        console.log('[TRACE:ATTENTION_FIRE]', JSON.stringify({
+            trigger: 'L3 Idle Aggregation',
+            idle_duration_ms: now - this._lastPlayerMessageTime,
+            total_attention: totalScore.toFixed(2),
+            queue_items: this.active_queue.map(o => ({type:o.type, score:o.attention_score, consumed:o.consumed})),
+            prompt_preview: prompt.slice(0, 300),
+        }));
+
+        // ═══ Persona Behavior Pipeline — L3 idle must go through generateBehavior ═══
+        if (this.agent.persona) {
+            const { intent, plan } = this.agent.persona.generateBehavior(
+                { type: 'idle', attention_score: 0.4 }, {}
+            );
+            if (plan.primary_action === 'ignore') return;
+            this.agent.persona.setActiveBehavior(intent, plan);
+        }
+
         this._lastProactiveExpression = now;
         this.autoSpeech.markConsumed(this.active_queue);
-        this.agent.handleMessage('system', prompt, 1).catch(() => {});
+        this.agent.llmGate.run(
+            () => this.agent.handleMessage('system', prompt, 1),
+            { throttled: true }
+        ).catch(() => {});
     }
 
     // ------------------------------------------------------------------
@@ -433,10 +512,36 @@ export class Observer {
 
         if (this.active_queue.length === 0) return;
 
-        // Fire-and-forget: don't await handleMessage (avoids blocking the tick)
-        this._lastProactiveExpression = now;
+        // Build prompt first — skip if empty (e.g. all observation types dropped)
         const prompt = this._buildSilencePrompt();
-        this.agent.handleMessage('system', prompt, 1).catch(() => {});
+        if (!prompt || prompt.trim() === '') return;
+
+        // [TRACE] Silence trigger FIRING
+        console.log('[TRACE:SILENCE_FIRE]', JSON.stringify({
+            trigger: 'L4 Silence',
+            silence_duration_ms: now - this._lastPlayerMessageTime,
+            queue_size: this.active_queue.length,
+            queue_items: this.active_queue.map(o => ({type:o.type, score:o.attention_score, consumed:o.consumed})),
+            prompt_full: prompt,
+        }));
+
+        // ═══ Persona Behavior Pipeline — L4 silence must go through generateBehavior ═══
+        if (this.agent.persona) {
+            const { intent, plan } = this.agent.persona.generateBehavior(
+                { type: 'idle', attention_score: 0.3 }, {}
+            );
+            if (plan.primary_action === 'ignore') return;
+            this.agent.persona.setActiveBehavior(intent, plan);
+        }
+
+        // Set cooldown and consume events BEFORE firing (prevents re-trigger loop)
+        this._lastProactiveExpression = now;
+        this.autoSpeech.markConsumed(this.active_queue);
+
+        this.agent.llmGate.run(
+            () => this.agent.handleMessage('system', prompt, 1),
+            { throttled: true }
+        ).catch(() => {});
     }
 
     _buildSilencePrompt() {
@@ -472,10 +577,11 @@ export class Observer {
         const filtered = lines.filter(Boolean);
         if (filtered.length === 0) return '';
 
+        const footer = this.worldState.realityGuard.buildSilenceFooter();
         return (
             '[Observation] ' +
             filtered.join(' ') +
-            ' (You may mention this naturally if it feels right — no need to force it.)'
+            ' ' + footer
         );
     }
 
@@ -484,9 +590,18 @@ export class Observer {
     // ------------------------------------------------------------------
 
     _expressImmediate(obs) {
+        // ═══ Persona Behavior Pipeline — death expression must go through generateBehavior ═══
+        if (this.agent.persona) {
+            const { intent, plan } = this.agent.persona.generateBehavior(
+                { type: 'player_death', attention_score: 1.0 }, {}
+            );
+            this.agent.persona.setActiveBehavior(intent, plan);
+        }
         const prompt = `[Urgent] ${obs.data.player || 'Someone'} has died${obs.data.message ? ': ' + obs.data.message : ''}. Respond with empathy.`;
-        // Fire-and-forget
-        this.agent.handleMessage('system', prompt, 1).catch(() => {});
+        // Fire-and-forget (interactive — no throttle)
+        this.agent.llmGate.run(
+            () => this.agent.handleMessage('system', prompt, 1)
+        ).catch(() => {});
     }
 
     // ------------------------------------------------------------------

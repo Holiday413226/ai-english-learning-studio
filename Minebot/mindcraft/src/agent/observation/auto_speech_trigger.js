@@ -278,13 +278,22 @@ export class AutoSpeechTrigger {
 
         if (lines.length === 0) return null;
 
-        return (
+        const prompt = (
             '[IMPORTANT EVENTS — These deserve your attention]\n' +
             lines.join('\n') +
             '\n\nYou may respond to these events even if the player does not speak. ' +
             'React naturally — express curiosity about new discoveries, ' +
             'caution about danger, or appreciation for beautiful moments.'
         );
+
+        // [TRACE] Full auto-speech prompt
+        console.log('[TRACE:BUILD_PROMPT]', JSON.stringify({
+            usable_count: usable.length,
+            usable_types: usable.map(o => ({type:o.type, score:o.attention_score})),
+            full_prompt: prompt,
+        }));
+
+        return prompt;
     }
 
     // ------------------------------------------------------------------

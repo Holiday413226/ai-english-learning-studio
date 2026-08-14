@@ -85,7 +85,7 @@ export function handleDisconnection(agentName, reason) {
 
 // Validates name format.
 export function validateNameFormat(name) {
-    if (!name || !/^[a-zA-Z0-9_]{3,16}$/.test(name)) {
+    if (!name || !/^[a-zA-Z0-9_ ]{3,24}$/.test(name)) {
         return { 
             success: false, 
             // Added [LoginGuard] prefix here for consistency

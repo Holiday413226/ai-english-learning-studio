@@ -6,12 +6,15 @@ import { Observer } from './observation/observer.js';
 import { Prompter } from '../models/prompter.js';
 import { initModes } from './modes.js';
 import { initBot } from '../utils/mcdata.js';
-import { containsCommand, commandExists, executeCommand, truncCommandMessage, isAction, blacklistCommands } from './commands/index.js';
+import { containsCommand, commandExists, executeCommand, truncCommandMessage, isAction, blacklistCommands, parseCommandMessage } from './commands/index.js';
+import { actionToCommand, commandToAction, parseActionProposal } from './action_executor.js';
 import { ActionManager } from './action_manager.js';
 import { NPCContoller } from './npc/controller.js';
 import { MemoryBank } from './memory_bank.js';
 import { SelfPrompter } from './self_prompter.js';
 import convoManager from './conversation.js';
+import { Persona } from './persona.js';
+import { loadPersonaData } from './persona_store.js';
 import { handleTranslation, handleEnglishTranslation } from '../utils/translator.js';
 import { addBrowserViewer } from './vision/browser_viewer.js';
 import { serverProxy, sendOutputToServer } from './mindserver_proxy.js';
@@ -20,11 +23,97 @@ import { Task } from './tasks/tasks.js';
 import { speak } from './speak.js';
 import { log, validateNameFormat, handleDisconnection } from './connection_handler.js';
 
+// ---------------------------------------------------------------------------
+// LLMGate — single-entry concurrency gate for LLM calls.
+// Guarantees at most 1 handleMessage in flight.  800ms throttle for autonomous
+// triggers (reflex / background).  Dedup for reflex events only.
+// Interactive triggers (player/bot/death/init) bypass throttle and dedup.
+// ---------------------------------------------------------------------------
+class LLMGate {
+    constructor() {
+        this.inFlight = false;
+        this.lastReflexTime = 0;
+        this.lastKey = '';
+        this._next = null;
+        this._pendingTime = 0;
+    }
+
+    async run(fn, opts = {}) {
+        const { throttled = false, dedupKey = '' } = opts;
+        const now = Date.now();
+
+        if (throttled && now - this.lastReflexTime < 800) return null;
+        if (dedupKey && dedupKey === this.lastKey && now - this.lastReflexTime < 800) return null;
+
+        if (this.inFlight) {
+            if (this._next) this._next.resolve?.(null);
+            this._next = { fn, resolve: null };
+            this._pendingTime = now;
+            return new Promise(r => { this._next.resolve = r; });
+        }
+
+        if (throttled) this.lastReflexTime = now;
+        if (dedupKey) this.lastKey = dedupKey;
+        return this._exec(fn);
+    }
+
+    async _exec(fn) {
+        this.inFlight = true;
+        try { return await fn(); }
+        finally {
+            this.inFlight = false;
+            if (this._next) {
+                if (Date.now() - this._pendingTime > 3000) {
+                    this._next.resolve?.(null);
+                    this._next = null;
+                } else {
+                    const n = this._next; this._next = null;
+                    try { const r = await this._exec(n.fn); n.resolve?.(r); }
+                    catch { n.resolve?.(null); }
+                }
+            }
+        }
+    }
+
+    static hashKey(type, prompt) {
+        return type + '|' + (prompt || '').slice(0, 80).replace(/\s+/g, ' ').trim();
+    }
+
+    // Instance wrapper so external callers (observer, conversation) can use
+    // this.agent.llmGate.hashKey(...) without referencing the class by name.
+    hashKey(type, prompt) {
+        return LLMGate.hashKey(type, prompt);
+    }
+}
+
+// ═══ V5 Expression Reality Guard — lightweight fabrication detection ═══
+// Runs after Expression LLM generation, before routeResponse.
+// See plan: mindcraft-ai-companion-noble-parnas.md § Risk 2 Fix B
+
+const FABRICATION_PATTERNS = [
+    { pattern: /我(更|越来越|开始|已经)?(信任|相信|依赖)(你|他|她)/, label: 'fabricated trust' },
+    { pattern: /(你|他|她)(是|成为)(我的|了)?(朋友|伙伴|同伴|重要的人)/, label: 'fabricated relationship' },
+    { pattern: /我(感到|觉得|变得)(更|越来越|开始)?(亲近|靠近|依赖|喜欢)/, label: 'fabricated emotion' },
+    { pattern: /我(会|将)(永远|一直|始终)(跟随|陪伴|保护|帮助)(你|他|她)/, label: 'fabricated promise' },
+    { pattern: /我(正在|开始|逐渐)(学会|懂得|理解|变得)/, label: 'fabricated development' },
+];
+
+function validateExpression(text) {
+    if (!text || typeof text !== 'string') return { valid: true };
+    for (const { pattern, label } of FABRICATION_PATTERNS) {
+        if (pattern.test(text)) {
+            return { valid: false, label };
+        }
+    }
+    return { valid: true };
+}
+
 export class Agent {
     async start(load_mem=false, init_message=null, count_id=0) {
         this.last_sender = null;
         this.count_id = count_id;
         this._disconnectHandled = false;
+        this.currentWorldId = `${settings.host}:${settings.port}`;
 
         // Initialize components
         this.actions = new ActionManager(this);
@@ -46,8 +135,27 @@ export class Agent {
         this.npc = new NPCContoller(this);
         this.memory_bank = new MemoryBank();
         this.self_prompter = new SelfPrompter(this);
+        this.llmGate = new LLMGate();
         convoManager.initAgent(this);
         await this.prompter.initExamples();
+
+        // ═══ Persona Engine — identity + intent + plan + drift ═══
+        const personaId = this.prompter.profile.persona_id || this.name;
+        const savedPersona = loadPersonaData(personaId);
+        if (savedPersona) {
+            this.persona = Persona.fromJSON(savedPersona);
+            console.log(`[PERSONA] Loaded persona '${this.persona.id}' from disk`);
+        } else {
+            this.persona = new Persona(personaId, {
+                name: this.name,
+                identity: this.prompter.profile.identity,
+                backstory: this.prompter.profile.backstory || settings.persona_backstory,
+                voice_style: this.prompter.profile.voice_style,
+                characterScript: this.prompter.profile.characterScript || settings.character_script,
+                traits: this.prompter.profile.traits,
+            });
+            console.log(`[PERSONA] Created new persona '${this.persona.id}'`);
+        }
 
         // load mem first before doing task
         let save_data = null;
@@ -75,8 +183,8 @@ export class Agent {
             // Log and Analyze
             // handleDisconnection handles logging to console and server
             const { type } = handleDisconnection(this.name, reason);
-     
-            process.exit(1);
+
+            process.exit(0);  // exit 0 = expected disconnect, triggers clean restart (not crash)
         };
         
         // Bind events
@@ -97,10 +205,15 @@ export class Agent {
             serverProxy.login();
             
             // Set skin for profile, requires Fabric Tailor. (https://modrinth.com/mod/fabrictailor)
-            if (this.prompter.profile.skin)
-                this.bot.chat(`/skin set URL ${this.prompter.profile.skin.model} ${this.prompter.profile.skin.path}`);
-            else
+            if (this.prompter.profile.skin) {
+                const skin = this.prompter.profile.skin;
+                console.log(`[Skin] Applying skin: ${skin.model}\n${skin.url}`);
+                this.bot.chat(`/skin set URL ${skin.model} ${skin.url}`);
+            }
+            else {
+                console.log('[Skin] No custom skin configured.');
                 this.bot.chat(`/skin clear`);
+            }
         });
 		const spawnTimeoutDuration = settings.spawn_timeout;
         const spawnTimeout = setTimeout(() => {
@@ -176,7 +289,9 @@ export class Agent {
                 }
                 else {
                     let translation = await handleEnglishTranslation(message);
-                    this.handleMessage(username, translation);
+                    this.llmGate.run(
+                        () => this.handleMessage(username, translation)
+                    ).catch(() => {});
                 }
             } catch (error) {
                 console.error('Error handling message:', error);
@@ -217,7 +332,9 @@ export class Agent {
             }
         }
         else if (init_message) {
-            await this.handleMessage('system', init_message, 2);
+            await this.llmGate.run(
+                () => this.handleMessage('system', init_message, 2)
+            );
         }
         else {
             this.openChat("Hello world! I am "+this.name);
@@ -275,7 +392,7 @@ export class Agent {
         const self_prompt = source === 'system' || source === this.name;
         const from_other_bot = convoManager.isOtherAgent(source);
 
-        if (!self_prompt && !from_other_bot) { // from user, check for forced commands
+        if (!self_prompt && !from_other_bot) { // Developer/Admin path — direct !command bypasses Persona
             const user_command_name = containsCommand(message);
             if (user_command_name) {
                 if (!commandExists(user_command_name)) {
@@ -320,73 +437,342 @@ export class Agent {
             await this.observer?.injectQueueToHistory();
         }
 
+        // ═══ Persona Behavior Pipeline — intent + plan before LLM ═══
+        // Persona decides WHAT to do; LLM only decides HOW to say it.
+        // Applies to ALL trigger sources including system events (init, death, etc.)
+        if (this.persona) {
+            // Track player relationship on each interaction
+            if (!self_prompt && source && source !== 'system') {
+                this.persona.updateRelationship(source);
+            }
+            const { intent, plan } = this.persona.generateBehavior(message, {
+                type: self_prompt ? 'system_event' : 'player_message',
+                source,
+                importance: self_prompt ? 0.7 : 0.8
+            });
+            this.persona.setActiveBehavior(intent, plan);
+            if (plan.primary_action === 'ignore') {
+                console.log('[PERSONA] Intent=ignore, skipping LLM call');
+                return false;
+            }
+        }
+
         // Handle other user messages
         await this.history.add(source, message);
         this.history.save();
+
+        // [TRACE] Log when handleMessage is called for system/auto-speech
+        if (self_prompt) {
+            console.log('[TRACE:SYSTEM_HANDLE]', JSON.stringify({
+                source: source,
+                message_snippet: message.slice(0, 200),
+                message_length: message.length,
+                history_size: this.history.getHistory().length,
+                is_idle: this.isIdle(),
+                shut_up: this.shut_up,
+                self_prompter_active: this.self_prompter?.isActive(),
+                observer_queue_size: this.observer?.active_queue?.length,
+            }));
+        }
 
         if (!self_prompt && this.self_prompter.isActive()) // message is from user during self-prompting
             max_responses = 1; // force only respond to this message, then let self-prompting take over
         for (let i=0; i<max_responses; i++) {
             if (checkInterrupt()) break;
             let history = this.history.getHistory();
+
+            // ═══════════════════════════════════════════════════════════════
+            // V5-CONVERGED: Universal entry — Cognitive LLM for ALL player msgs
+            // ═══════════════════════════════════════════════════════════════
+            if (!self_prompt && source && source !== 'system') {
+
+                // ═══ Pause autonomous modes during player-requested action pipeline ═══
+                // Prevents hunting/item_collecting/etc. from firing during LLM calls
+                // and interrupting the player's command before it starts executing.
+                const AUTONOMOUS_MODES = ['hunting', 'item_collecting', 'torch_placing', 'elbow_room'];
+                for (const m of AUTONOMOUS_MODES) {
+                    if (this.bot.modes.isOn(m)) this.bot.modes.pause(m);
+                }
+
+                // ── Cognitive: Intent Recognition (lightweight, no $PERSONA) ──
+                console.log('[V5:COGNITIVE] Calling Cognitive LLM...');
+                let cognitiveRes = await this.prompter.promptCognitive(history);
+                console.log('[V5:COGNITIVE] Output length:', cognitiveRes?.length || 0,
+                    '| Snippet:', String(cognitiveRes).slice(0, 300).replace(/\n/g, '\\n'));
+
+                let proposal = (cognitiveRes && cognitiveRes.trim().length > 0)
+                    ? parseActionProposal(cognitiveRes) : null;
+
+                if (!proposal) {
+                    console.log('[V5:COGNITIVE] parseActionProposal returned null — falling to chat path');
+                } else if (proposal.type === 'chat') {
+                    console.log('[V5:COGNITIVE] Cognitive returned chat intent — no action to execute');
+                }
+
+                if (proposal && proposal.type === 'action' && proposal.action?.type) {
+                    console.log('[V5:COGNITIVE] Proposed action:', JSON.stringify(proposal.action));
+
+                    // ── Persona Decision Gate (with runtime context) ──
+                    const decision = this.persona
+                        ? this.persona.evaluateWithContext(proposal.action, {
+                            source,
+                            worldState: this.observer?.worldState?.summarize?.(),
+                          })
+                        : { decision: 'accept', reason: 'No persona.', speech_hint: '', runtime_context: null };
+
+                    let actionResult = '';
+                    let executed = false;
+
+                    switch (decision.decision) {
+                        case 'accept':
+                        case 'modify': {
+                            const action = decision.action || proposal.action;
+                            const cmd = actionToCommand(action);
+                            if (cmd) {
+                                console.log(`[V5] Persona ${decision.decision}ed: ${action.type} → ${cmd} (${decision.reason})`);
+                                this.history.add('system', `[Action planned: ${action.type} ${action.target || ''}]`);
+                                // V5-FIX: Describe pending action for Expression LLM,
+                                // defer actual execution to avoid blocking on endless actions.
+                                // IMPORTANT: No raw !command text — prevents Expression LLM from
+                                // hallucinating fake !command syntax in chat output.
+                                const amountHint = action.params?.amount ? ` (amount: ${action.params.amount})` : '';
+                                actionResult = `About to ${action.type} ${action.target || ''}${amountHint}.`;
+                                executed = true;
+                                used_command = true;
+                            } else {
+                                console.warn(`[V5] actionToCommand returned null for:`, action);
+                                actionResult = `Unable to execute ${action.type}.`;
+                                this.history.add('system', actionResult);
+                            }
+                            break;
+                        }
+                        case 'reject':
+                        case 'hesitate':
+                            console.log(`[V5] Persona ${decision.decision}ed: ${proposal.action.type} — ${decision.reason}`);
+                            // V3-FIX: Override speech hint with explicit refusal instruction.
+                            // Without this, Expression LLM role-play tendencies cause "OK I'll follow"
+                            // despite the Gate having decided NOT to execute the action.
+                            decision.speech_hint = `MUST_DECLINE: Persona decided to ${decision.decision} this request. ` +
+                                `You must state your refusal or hesitation briefly in character. ` +
+                                `Do NOT say anything that sounds like you are doing the action.`;
+                            decision.reason = `Player requested: ${proposal.action.type} ${proposal.action.target || ''}. ` +
+                                `Decision: ${decision.decision}. Why: ${decision.reason}.`;
+                            actionResult = `${decision.decision}: ${decision.reason}`;
+                            this.history.add('system',
+                                `[Persona ${decision.decision}ed ${proposal.action.type}: ${decision.reason}]`);
+                            break;
+                    }
+
+                    // ── Expression LLM (minimal Profile + Runtime State) ──
+                    // V5-FIX: Expression runs BEFORE command execution so player gets immediate feedback.
+                    let expressionRes = await this.prompter.promptConvo(history, {
+                        actionResult,
+                        decisionContext: decision.decision,
+                        decisionReason: decision.reason,
+                        relationshipContext: decision.runtime_context?.relationship || null,
+                        speechHint: decision.speech_hint || '',
+                    });
+
+                    console.log(`${this.name} expression to ${source}: ""${expressionRes}""`);
+
+                    // Reality Guard — debug logging only
+                    const guard = validateExpression(expressionRes);
+                    if (!guard.valid) {
+                        console.warn(`[REALITY_GUARD:DEBUG] Detected ${guard.label} in expression: "${String(expressionRes).slice(0, 100)}"`);
+                    }
+
+                    if (expressionRes && expressionRes.trim().length > 0) {
+                        this.history.add(this.name, expressionRes);
+                        this.routeResponse(source, expressionRes);
+                    }
+
+                    // V5-FIX: Fire-and-forget command execution AFTER expression is sent.
+                    // Prevents blocking on resume-based endless actions (followPlayer, goToPlayer, etc.)
+                    if (executed) {
+                        const action = decision.action || proposal.action;
+                        const cmd = actionToCommand(action);
+                        if (cmd) {
+                            executeCommand(this, cmd).then(result => {
+                                if (result) this.history.add('system', result);
+                                console.log('Agent executed:', cmd, 'and got:', result);
+                            }).catch(err => {
+                                console.error('Agent execution error:', err);
+                            });
+                        }
+                    }
+
+                    this.self_prompter.handleUserPromptedCmd(self_prompt, executed);
+                    this.history.save();
+                    // Resume autonomous modes now that action is executing (or failed to start).
+                    // Modes with interrupts removed won't interrupt the running action.
+                    for (const m of AUTONOMOUS_MODES) {
+                        this.bot.modes.unpause(m);
+                    }
+                    break; // Exit loop — action handled
+                }
+
+                // ── Chat Path: Cognitive returned {type:"chat"} or parse failed ──
+                // Single LLM call with full Profile — no !command capability.
+                let res = await this.prompter.promptConvo(history);
+
+                console.log(`${this.name} full response to ${source}: ""${res}""`);
+
+                if (res.trim().length === 0) {
+                    console.warn('no response');
+                    for (const m of AUTONOMOUS_MODES) {
+                        this.bot.modes.unpause(m);
+                    }
+                    break;
+                }
+
+                // ── !command 兜底（镜像 system 路径 662-728）— 经 Persona Gate ──
+                let command_name = containsCommand(res);
+                if (command_name && commandExists(command_name)) {
+                    res = truncCommandMessage(res);
+                    const parsed = parseCommandMessage(res);
+                    let rejected = false;
+                    if (typeof parsed === 'object') {
+                        const action = commandToAction(parsed.commandName, parsed.args);
+                        if (action && this.persona) {
+                            const decision = this.persona.evaluateActionProposal(action, { source });
+                            if (decision.decision === 'reject' || decision.decision === 'hesitate') {
+                                rejected = true;
+                                console.log(`[PERSONA] Action ${decision.decision}ed: ${action.type} — ${decision.reason}`);
+                                // 关键：不把原"答应"文本发出去，而是重新生成拒绝回复（言行一致）
+                                decision.speech_hint = `MUST_DECLINE: Persona decided to ${decision.decision} this request. ` +
+                                    `State your refusal or hesitation briefly in character. ` +
+                                    `Do NOT say anything that sounds like you are doing the action.`;
+                                decision.reason = `Player requested: ${action.type} ${action.target || ''}. ` +
+                                    `Decision: ${decision.decision}. Why: ${decision.reason}.`;
+                                let refusalRes = await this.prompter.promptConvo(history, {
+                                    actionResult: `${decision.decision}: ${decision.reason}`,
+                                    decisionContext: decision.decision,
+                                    decisionReason: decision.reason,
+                                    relationshipContext: this.persona?.getRelationship(source) || null,
+                                    speechHint: decision.speech_hint,
+                                });
+                                this.history.add(this.name, refusalRes);
+                                this.routeResponse(source, refusalRes);
+                            } else if (decision.decision === 'modify') {
+                                const newCmd = actionToCommand(decision.action);
+                                if (newCmd) res = newCmd;
+                            }
+                        }
+                    }
+                    if (!rejected) {
+                        // 只把命令前的口语（"……好。"）发给玩家，不泄露 !command 原文
+                        let pre_message = res.substring(0, res.indexOf(command_name)).trim();
+                        if (pre_message.length > 0) this.routeResponse(source, pre_message);
+                        this.history.add(this.name, res);
+                        this.self_prompter.handleUserPromptedCmd(self_prompt, isAction(command_name));
+                        let execute_res = await executeCommand(this, res);
+                        used_command = true;
+                        if (execute_res) this.history.add('system', execute_res);
+                    }
+                } else {
+                    this.history.add(this.name, res);
+                    this.routeResponse(source, res);
+                }
+                this.history.save();
+                // Resume autonomous modes on chat path
+                for (const m of AUTONOMOUS_MODES) {
+                    this.bot.modes.unpause(m);
+                }
+                break;
+            }
+
+            // ═══════════════════════════════════════════════════════════════
+            // SYSTEM / SELF-PROMPT PATH — system events, autonomous prompts
+            // ═══════════════════════════════════════════════════════════════
             let res = await this.prompter.promptConvo(history);
 
             console.log(`${this.name} full response to ${source}: ""${res}""`);
 
-            if (res.trim().length === 0) {
-                console.warn('no response')
-                break; // empty response ends loop
+            if (self_prompt) {
+                console.log('[TRACE:LLM_RESPONSE]', JSON.stringify({
+                    source: source,
+                    response_length: res.length,
+                    response_trimmed_length: res.trim().length,
+                    response_preview: res.slice(0, 200),
+                    is_empty: res.trim().length === 0,
+                    is_tab_only: res.trim() === '\t' || res === '\t',
+                    attempt_in_loop: i,
+                }));
             }
 
-            let command_name = containsCommand(res);
+            if (res.trim().length === 0) {
+                console.warn('no response')
+                break;
+            }
 
-            if (command_name) { // contains query or command
-                res = truncCommandMessage(res); // everything after the command is ignored
+            // System path: post-hoc command interception for backward compat
+            let command_name = containsCommand(res);
+            if (command_name) {
+                res = truncCommandMessage(res);
                 this.history.add(this.name, res);
-                
+
                 if (!commandExists(command_name)) {
                     this.history.add('system', `Command ${command_name} does not exist.`);
                     console.warn('Agent hallucinated command:', command_name)
                     continue;
                 }
 
+                if (this.persona && !self_prompt) {
+                    const parsed = parseCommandMessage(res);
+                    if (typeof parsed === 'object') {
+                        const action = commandToAction(parsed.commandName, parsed.args);
+                        if (action) {
+                            const decision = this.persona.evaluateActionProposal(action, {
+                                source,
+                                worldState: this.observer?.worldState?.summarize?.(),
+                            });
+                            switch (decision.decision) {
+                                case 'reject':
+                                case 'hesitate':
+                                    console.log(`[PERSONA] Action ${decision.decision}ed: ${action.type} — ${decision.reason}`);
+                                    this.history.add('system',
+                                        `[Persona ${decision.decision}ed ${action.type}: ${decision.reason}]`);
+                                    continue;
+                                case 'modify':
+                                    const newCmd = actionToCommand(decision.action);
+                                    if (newCmd) res = newCmd;
+                                    break;
+                                case 'accept':
+                                    break;
+                            }
+                        }
+                    }
+                }
+
                 if (checkInterrupt()) break;
                 this.self_prompter.handleUserPromptedCmd(self_prompt, isAction(command_name));
-
-                if (settings.show_command_syntax === "full") {
-                    this.routeResponse(source, res);
-                }
-                else if (settings.show_command_syntax === "shortened") {
-                    // show only "used !commandname"
-                    let pre_message = res.substring(0, res.indexOf(command_name)).trim();
-                    let chat_message = `*used ${command_name.substring(1)}*`;
-                    if (pre_message.length > 0)
-                        chat_message = `${pre_message}  ${chat_message}`;
-                    this.routeResponse(source, chat_message);
-                }
-                else {
-                    // no command at all
-                    let pre_message = res.substring(0, res.indexOf(command_name)).trim();
-                    if (pre_message.trim().length > 0)
-                        this.routeResponse(source, pre_message);
-                }
-
                 let execute_res = await executeCommand(this, res);
-
-                console.log('Agent executed:', command_name, 'and got:', execute_res);
                 used_command = true;
 
                 if (execute_res)
                     this.history.add('system', execute_res);
                 else
                     break;
-            }
-            else { // conversation response
+
+                if (settings.show_command_syntax === "full") {
+                    this.routeResponse(source, res);
+                } else if (settings.show_command_syntax === "shortened") {
+                    let pre_message = res.substring(0, res.indexOf(command_name)).trim();
+                    let chat_message = `*used ${command_name.substring(1)}*`;
+                    if (pre_message.length > 0)
+                        chat_message = `${pre_message}  ${chat_message}`;
+                    this.routeResponse(source, chat_message);
+                } else {
+                    let pre_message = res.substring(0, res.indexOf(command_name)).trim();
+                    if (pre_message.trim().length > 0)
+                        this.routeResponse(source, pre_message);
+                }
+            } else {
                 this.history.add(this.name, res);
                 this.routeResponse(source, res);
                 break;
             }
-            
+
             this.history.save();
         }
 
@@ -435,7 +821,14 @@ export class Agent {
             if (settings.speak) {
                 speak(to_translate, this.prompter.profile.speak_model);
             }
-            if (settings.chat_ingame) {this.bot.chat(message);}
+            if (settings.chat_ingame) {
+                // [TRACE] Log final speech output
+                console.log('[TRACE:BOT_CHAT]', JSON.stringify({
+                    message: message,
+                    message_length: message.length,
+                }));
+                this.bot.chat(message);
+            }
             sendOutputToServer(this.name, message);
         }
     }
@@ -498,7 +891,11 @@ export class Agent {
                     death_pos_text = `x: ${death_pos.x.toFixed(2)}, y: ${death_pos.y.toFixed(2)}, z: ${death_pos.z.toFixed(2)}`;
                 }
                 let dimention = this.bot.game.dimension;
-                this.handleMessage('system', `You died at position ${death_pos_text || "unknown"} in the ${dimention} dimension with the final message: '${message}'. Your place of death is saved as 'last_death_position' if you want to return. Previous actions were stopped and you have respawned.`);
+                this.llmGate.run(
+                    () => this.handleMessage('system', `You died at position ${death_pos_text || "unknown"} in the ${dimention} dimension with the final message: '${message}'. Your place of death is saved as 'last_death_position' if you want to return. Previous actions were stopped and you have respawned.`)
+                ).catch(() => {});
+                // Persona drift — death events shape caution trait
+                this.persona?.drift({ type: 'player_death', attention_score: 1.0 });
             }
         });
         this.bot.on('idle', () => {

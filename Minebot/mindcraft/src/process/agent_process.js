@@ -8,6 +8,7 @@ export class AgentProcess {
     constructor(name, port) {
         this.name = name;
         this.port = port;
+        this._pending_restart = false;
     }
 
     start(load_memory=false, init_message=null, count_id=0) {
@@ -27,26 +28,39 @@ export class AgentProcess {
             stdio: 'inherit',
             stderr: 'inherit',
         });
-        
-        let last_restart = Date.now();
+
+        let last_restart = 0;  // 0 = first restart always allowed (vs Date.now() which blocks first restart)
         agentProcess.on('exit', (code, signal) => {
             console.log(`Agent process exited with code ${code} and signal ${signal}`);
             this.running = false;
             logoutAgent(this.name);
-            
+
             if (code > 1) {
                 console.log(`Ending task`);
                 process.exit(code);
             }
 
-            if (code !== 0 && signal !== 'SIGINT') {
+            if (signal !== 'SIGINT' && signal !== 'SIGTERM') {
                 // agent must run for at least 10 seconds before restarting
                 if (Date.now() - last_restart < 10000) {
-                    console.error(`Agent process exited too quickly and will not be restarted.`);
+                    // Rapid crash — delay restart instead of giving up permanently
+                    if (this._pending_restart) {
+                        console.error(`Agent process exited too quickly — restart already pending, skipping.`);
+                        return;
+                    }
+                    this._pending_restart = true;
+                    console.error(`Agent process exited too quickly. Retrying in 10s...`);
+                    setTimeout(() => {
+                        this._pending_restart = false;
+                        console.log('Restarting agent (delayed)...');
+                        this.start(true, 'Agent process restarted.', count_id);
+                        last_restart = Date.now();
+                    }, 10000);
                     return;
                 }
+                this._pending_restart = false;
                 console.log('Restarting agent...');
-                this.start(true, 'Agent process restarted.', count_id, this.port);
+                this.start(true, 'Agent process restarted.', count_id);
                 last_restart = Date.now();
             }
         });

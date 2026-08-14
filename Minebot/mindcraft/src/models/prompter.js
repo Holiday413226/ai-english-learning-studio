@@ -13,6 +13,58 @@ import { selectAPI, createModel } from './_model_map.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// ═══ Memory Truth Hierarchy — injected via $MEMORY_RULES ═══
+const MEMORY_HIERARCHY_RULES = `[MEMORY TRUTH HIERARCHY — CRITICAL RULES]
+
+1. PRIORITY (highest → lowest):
+   PERSONA > WORLD > EPISODIC > SUMMARY > OBSERVATION
+
+2. OVERRIDE RULE:
+   Higher layer OVERRIDES lower layer. If your PERSONA identity says you are
+   peaceful, but a SUMMARY memory claims you attacked something, your PERSONA
+   is always correct. The memory is mistaken.
+   Within the same layer, newer information overrides older information.
+
+3. CONTRADICTION RESOLUTION:
+   When different layers conflict, TRUST THE HIGHER LAYER.
+   You may express uncertainty: "My memory says X, but that doesn't feel
+   right... maybe I misremember."
+   NEVER use a lower-layer fact to contradict a higher-layer truth.
+
+4. SOURCE AWARENESS:
+   [PERSONA]  = your immutable identity — NEVER changes from events
+   [WORLD]    = current world facts — resets when you enter a new world
+   [EPISODIC] = your experiences in this world — personal history
+   [SUMMARY]  = compressed conversation memory — may be distorted by summarization
+   [OBSERVE]  = recent temporary observations — may already be stale`;
+
+// ═══ Reality Boundary — injected via $REALITY_BOUNDARY ═══
+// Constrains Expression LLM to describe only facts, not fabricate.
+const REALITY_BOUNDARY = `[REALITY BOUNDARY — EXPRESSION CONSTRAINTS]
+
+You are describing an action that has ALREADY HAPPENED. You are NOT:
+- A decision-maker (the decision was already made by Persona)
+- A future-action proposer (actions are already executed)
+- A relationship tracker (Persona handles that)
+- A character-development narrator
+
+YOU MAY describe:
+- The action that just occurred (using the action result shown above)
+- Your immediate acknowledgment of the result
+- Brief character-appropriate reaction to the fact
+
+YOU MUST NOT fabricate or imply:
+- Emotional changes ("I feel closer to you now")
+- Trust changes ("I trust you more now")
+- Relationship changes ("You are my friend now")
+- Promises or commitments ("I will always follow you")
+- Character development ("I am learning to trust people")
+- Mental states not in the action result ("I was worried")
+
+If the action failed, state the failure. If it succeeded, acknowledge it.
+Keep responses BRIEF — one sentence is usually enough.
+Do NOT output !command syntax.`;
+
 export class Prompter {
     constructor(agent, profile) {
         this.agent = agent;
@@ -134,8 +186,56 @@ export class Prompter {
         }
     }
 
-    async replaceStrings(prompt, messages, examples=null, to_summarize=[], last_goals=null) {
+    async replaceStrings(prompt, messages, examples=null, to_summarize=[], last_goals=null, expressionContext=null) {
         prompt = prompt.replaceAll('$NAME', this.agent.name);
+
+        // ═══ Persona Engine placeholders ═══
+        if (prompt.includes('$PERSONA')) {
+            prompt = prompt.replaceAll('$PERSONA',
+                (this.agent.persona?.buildPrompt() || '') + '\n' +
+                (this.agent.persona?.buildMemoryPrompt(this.agent.currentWorldId) || ''));
+        }
+        // V5-Converged: Minimal Expression Persona (identity + voice + core principles only)
+        if (prompt.includes('$EXPRESSION_PERSONA')) {
+            prompt = prompt.replaceAll('$EXPRESSION_PERSONA',
+                this.agent.persona?.buildExpressionPrompt() || '');
+        }
+        // V5-Converged: Relationship context for Expression LLM
+        if (prompt.includes('$RELATIONSHIP_CONTEXT')) {
+            const relCtx = expressionContext?.relationshipContext;
+            if (relCtx) {
+                prompt = prompt.replaceAll('$RELATIONSHIP_CONTEXT',
+                    `[RELATIONSHIP CONTEXT] You have known this player for ${relCtx.daysKnown} days ` +
+                    `(${relCtx.interactions} interactions, trust=${relCtx.trust.toFixed(2)}). ` +
+                    `Your phase: ${relCtx.phase}.`);
+            } else {
+                prompt = prompt.replaceAll('$RELATIONSHIP_CONTEXT', '');
+            }
+        }
+        if (prompt.includes('$MEMORY_RULES')) {
+            prompt = prompt.replaceAll('$MEMORY_RULES', MEMORY_HIERARCHY_RULES);
+        }
+        if (prompt.includes('$INTENT') && this.agent.persona?.activeBehavior?.intent) {
+            const i = this.agent.persona.activeBehavior.intent;
+            prompt = prompt.replaceAll('$INTENT',
+                `[CURRENT INTENT] Type: ${i.type}. Urgency: ${i.urgency.toFixed(1)}. ` +
+                `Emotion: ${i.emotion}. ${i.reason ? 'Reason: ' + i.reason + '.' : ''}`);
+        } else if (prompt.includes('$INTENT')) {
+            prompt = prompt.replaceAll('$INTENT', '');
+        }
+        if (prompt.includes('$ACTION_PLAN') && this.agent.persona?.activeBehavior?.plan) {
+            const p = this.agent.persona.activeBehavior.plan;
+            let planText = `[ACTION PLAN] Primary: ${p.primary_action}. `;
+            if (p.suggested_action) {
+                planText += `Proposed action: ${JSON.stringify(p.suggested_action)}. `;
+            }
+            planText += `${p.narration_hint ? 'How to express: ' + p.narration_hint + '. ' : ''}`;
+            planText += `Sub-actions: ${p.sub_actions.join(' → ') || 'none'}. `;
+            planText += `Will remember: ${p.memory_write ? 'yes' : 'no'}.`;
+            prompt = prompt.replaceAll('$ACTION_PLAN', planText);
+        } else if (prompt.includes('$ACTION_PLAN')) {
+            prompt = prompt.replaceAll('$ACTION_PLAN', '');
+        }
 
         if (prompt.includes('$STATS')) {
             let stats = await getCommand('!stats').perform(this.agent) + '\n';
@@ -166,6 +266,82 @@ export class Prompter {
             prompt = prompt.replaceAll('$EXAMPLES', await examples.createExampleMessage(messages));
         if (prompt.includes('$MEMORY'))
             prompt = prompt.replaceAll('$MEMORY', this.agent.history.memory);
+
+        // V5 Reality Layer — ground truth from World State Manager
+        if (prompt.includes('$REALITY_RULES')) {
+            const wsm = this.agent.observer?.worldState;
+            const rules = wsm?.realityGuard?.buildGuardPrompt(
+                wsm.actionLog
+            ) || '';
+            prompt = prompt.replaceAll('$REALITY_RULES', rules);
+            // [TRACE] Log expanded $REALITY_RULES
+            console.log('[TRACE:REALITY_RULES]', JSON.stringify({
+                placeholder: '$REALITY_RULES',
+                expanded_length: rules.length,
+                expanded_text: rules,
+            }));
+        }
+        if (prompt.includes('$ACTION_LOG')) {
+            const wsm = this.agent.observer?.worldState;
+            const log = wsm?.actionLog?.formatForPrompt(5) ||
+                'No actions performed yet.';
+            prompt = prompt.replaceAll('$ACTION_LOG', log);
+            // [TRACE] Log expanded $ACTION_LOG
+            console.log('[TRACE:ACTION_LOG]', JSON.stringify({
+                placeholder: '$ACTION_LOG',
+                expanded_text: log,
+            }));
+        }
+
+        // ═══ V5 Reality Boundary — expression constraints ═══
+        // Only injected when expressionContext is provided (Expression path).
+        if (prompt.includes('$REALITY_BOUNDARY')) {
+            if (expressionContext && expressionContext.decisionContext !== 'chat') {
+                prompt = prompt.replaceAll('$REALITY_BOUNDARY', REALITY_BOUNDARY);
+            } else {
+                prompt = prompt.replaceAll('$REALITY_BOUNDARY', '');
+            }
+        }
+
+        // ═══ V5 Expression Context — action result + decision + speech hint ═══
+        if (prompt.includes('$ACTION_RESULT')) {
+            const actionResult = expressionContext?.actionResult || '';
+            if (actionResult) {
+                prompt = prompt.replaceAll('$ACTION_RESULT',
+                    `[ACTION RESULT — What Just Happened]\n${actionResult}`);
+            } else {
+                prompt = prompt.replaceAll('$ACTION_RESULT', '');
+            }
+        }
+        if (prompt.includes('$DECISION_CONTEXT')) {
+            const decisionContext = expressionContext?.decisionContext || 'chat';
+            if (decisionContext !== 'chat') {
+                const reason = expressionContext?.decisionReason || '';
+                const reasonText = reason ? ` Reason: ${reason}.` : '';
+                prompt = prompt.replaceAll('$DECISION_CONTEXT',
+                    `[DECISION CONTEXT] Persona decided: ${decisionContext}.${reasonText} Describe this in your character's voice.`);
+            } else {
+                prompt = prompt.replaceAll('$DECISION_CONTEXT', '');
+            }
+        }
+        if (prompt.includes('$SPEECH_HINT')) {
+            const speechHint = expressionContext?.speechHint || '';
+            if (speechHint) {
+                prompt = prompt.replaceAll('$SPEECH_HINT',
+                    `[SPEECH DIRECTION] ${speechHint}.`);
+            } else {
+                prompt = prompt.replaceAll('$SPEECH_HINT', '');
+            }
+        }
+
+        // [TRACE] Log memory content when injected
+        if (prompt.includes('$MEMORY')) {
+            console.log('[TRACE:MEMORY_INJECT]', JSON.stringify({
+                memory_length: (this.agent.history?.memory || '').length,
+                memory_snippet: (this.agent.history?.memory || '').slice(0, 300),
+            }));
+        }
+
         if (prompt.includes('$TO_SUMMARIZE'))
             prompt = prompt.replaceAll('$TO_SUMMARIZE', stringifyTurns(to_summarize));
         if (prompt.includes('$CONVO'))
@@ -211,7 +387,7 @@ export class Prompter {
         this.last_prompt_time = Date.now();
     }
 
-    async promptConvo(messages) {
+    async promptConvo(messages, expressionContext=null) {
         this.most_recent_msg_time = Date.now();
         let current_msg_time = this.most_recent_msg_time;
 
@@ -222,7 +398,42 @@ export class Prompter {
             }
 
             let prompt = this.profile.conversing;
-            prompt = await this.replaceStrings(prompt, messages, this.convo_examples);
+
+            // ═══ V5-Converged: Strip Expression-only placeholders from chat path ═══
+            // NOTE: $COMMAND_DOCS is kept so the chat-path LLM can emit correct
+            // !command syntax as a fallback (executed via the chat path's Persona Gate).
+            prompt = prompt.replace('$EXAMPLES\n', '').replace('$EXAMPLES', '');
+
+            // ═══ V5-Converged Expression Path ═══
+            if (expressionContext && expressionContext.decisionContext !== 'chat') {
+                // Inject REALITY_BOUNDARY constraints at the top of the prompt
+                prompt = REALITY_BOUNDARY + '\n\n' + prompt;
+                // Remove full $PERSONA — use $EXPRESSION_PERSONA (minimal: identity + voice + principles)
+                prompt = prompt.replace('$PERSONA\n', '').replace('$PERSONA', '');
+                // Remove $REALITY_RULES — Expression LLM must NEVER see !command permission.
+                // (REALITY_RULES says "use !command syntax" — a legacy of the single-phase pipeline.)
+                prompt = prompt.replace('$REALITY_RULES\n', '').replace('$REALITY_RULES', '');
+            } else {
+                // Chat path: remove Expression-only placeholders
+                prompt = prompt.replace('$EXPRESSION_PERSONA\n', '').replace('$EXPRESSION_PERSONA', '');
+                prompt = prompt.replace('$RELATIONSHIP_CONTEXT\n', '').replace('$RELATIONSHIP_CONTEXT', '');
+            }
+
+            prompt = await this.replaceStrings(prompt, messages, this.convo_examples, [], null, expressionContext);
+
+            // [TRACE] Log the FINAL assembled prompt + messages sent to LLM
+            console.log('[TRACE:FINAL_PROMPT]', JSON.stringify({
+                attempt: i+1,
+                system_prompt_length: prompt.length,
+                system_prompt: prompt,
+                message_count: messages.length,
+                messages: messages.map(m => ({
+                    role: m.role,
+                    content_snippet: String(m.content||'').slice(0, 200),
+                    content_length: String(m.content||'').length,
+                })),
+            }));
+
             let generation;
 
             try {
@@ -259,6 +470,31 @@ export class Prompter {
         }
 
         return '';
+    }
+
+    /**
+     * V5 Cognitive Phase — propose action based on player intent.
+     * Uses the `cognitive` profile prompt. Output is structured JSON, not player-visible text.
+     *
+     * @param {Array} messages — conversation history
+     * @returns {string} — raw LLM output (expected to be JSON)
+     */
+    async promptCognitive(messages) {
+        await this.checkCooldown();
+        if (!this.profile.cognitive) {
+            console.warn('[COGNITIVE] No cognitive profile field — falling back to single-phase');
+            return '';
+        }
+        let prompt = this.profile.cognitive;
+        prompt = await this.replaceStrings(prompt, messages, null); // no conversation examples for Cognitive
+        console.log('[TRACE:COGNITIVE_PROMPT]', JSON.stringify({
+            prompt_length: prompt.length,
+            prompt_snippet: prompt.slice(0, 300),
+        }));
+        let generation = await this.chat_model.sendRequest(messages, prompt);
+        console.log('[COGNITIVE] Raw output:', generation);
+        await this._saveLog(prompt, messages, generation, 'cognitive');
+        return generation;
     }
 
     async promptCoding(messages) {

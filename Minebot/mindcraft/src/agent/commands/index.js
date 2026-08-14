@@ -224,6 +224,12 @@ export async function executeCommand(agent, message) {
             return `Command ${command.name} was given ${numArgs} args, but requires ${numParams(command)} args.`;
         else {
             const result = await command.perform(agent, ...parsed.args);
+            // V5: Record to Action Log (ground truth for "what the bot actually did")
+            if (agent.observer?.worldState?.actionLog) {
+                agent.observer.worldState.actionLog.record(
+                    parsed.commandName, parsed.args, result
+                );
+            }
             return result;
         }
     }

@@ -22,13 +22,26 @@ class MindServerProxy {
         if (this.connected) return;
         
         this.name = name;
-        this.socket = io(`http://localhost:${port}`);
+        this.socket = io(`http://localhost:${port}`, {
+            timeout: 10000,           // 10s per-attempt timeout
+            reconnectionAttempts: 5,  // allow retries for transient startup delays
+        });
 
+        // Wait for first successful connection. Socket.io retries internally
+        // with exponential backoff — do NOT reject on connect_error, let it retry.
+        // Only fail if the safety timeout expires (genuinely unreachable server).
         await new Promise((resolve, reject) => {
-            this.socket.on('connect', resolve);
+            const safetyTimeout = setTimeout(() => {
+                reject(new Error('Could not connect to MindServer within 30s'));
+            }, 30000);
+            this.socket.on('connect', () => {
+                clearTimeout(safetyTimeout);
+                resolve();
+            });
             this.socket.on('connect_error', (err) => {
-                console.error('Connection failed:', err);
-                reject(err);
+                // Do NOT reject here — socket.io auto-reconnects.
+                // Just log for diagnostics.
+                console.warn('Connection attempt failed, will retry:', err.message);
             });
         });
 
@@ -66,6 +79,14 @@ class MindServerProxy {
                 this.agent.respondFunc(data.from, data.message);
             } catch (error) {
                 console.error('Error: ', JSON.stringify(error, Object.getOwnPropertyNames(error)));
+            }
+        });
+
+        // Test skin immediately without restarting agent
+        this.socket.on('set-skin', (model, url) => {
+            if (this.agent && this.agent.bot && this.agent.bot.chat) {
+                console.log(`[Skin] Test skin: ${model} ${url}`);
+                this.agent.bot.chat(`/skin set URL ${model} ${url}`);
             }
         });
 

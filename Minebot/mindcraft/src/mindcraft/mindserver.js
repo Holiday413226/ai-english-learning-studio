@@ -1,10 +1,10 @@
-import { Server } from 'socket.io';
+﻿import { Server } from 'socket.io';
 import express from 'express';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import * as mindcraft from './mindcraft.js';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync } from 'fs';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Mindserver is:
@@ -143,14 +143,21 @@ export function createMindServer(host_public = false, port = 8080) {
                     callback({ success: false, error: 'Agent already exists' });
                     return;
                 }
-                let returned = await mindcraft.createAgent(settings);
-                callback({ success: returned.success, error: returned.error });
-                let name = settings.profile.name;
-                if (!returned.success && agent_connections[name]) {
-                    mindcraft.destroyAgent(name);
-                    delete agent_connections[name];
+                console.log('[MIND SERVER] Creating agent:', settings.profile.name);
+                try {
+                    let returned = await mindcraft.createAgent(settings);
+                    console.log('[MIND SERVER] createAgent returned:', returned);
+                    callback({ success: returned.success, error: returned.error });
+                    let name = settings.profile.name;
+                    if (!returned.success && agent_connections[name]) {
+                        mindcraft.destroyAgent(name);
+                        delete agent_connections[name];
+                    }
+                    agentsStatusUpdate();
+                } catch (err) {
+                    console.error('[MIND SERVER] createAgent crashed:', err);
+                    callback({ success: false, error: err.message || 'Internal server error' });
                 }
-                agentsStatusUpdate();
             }
             else {
                 console.error('Agent name is required in profile');
@@ -209,7 +216,23 @@ export function createMindServer(host_public = false, port = 8080) {
         socket.on('set-agent-settings', (agentName, settings) => {
             const agent = agent_connections[agentName];
             if (agent) {
+                mindcraft.applySkinToProfile(settings); // merge skin_url/skin_model into profile.skin
                 agent.setSettings(settings);
+                // Sync to disk for persistent agents
+                const agentJsonPath = `./bots/${agentName}/agent.json`;
+                if (existsSync(agentJsonPath)) {
+                    try {
+                        const meta = JSON.parse(readFileSync(agentJsonPath, 'utf8'));
+                        // Update non-profile settings in agent.json (keep profile in last_profile.json)
+                        const { profile, ...nonProfileSettings } = settings;
+                        meta.settings = nonProfileSettings;
+                        if (settings.agent_type) meta.type = settings.agent_type;
+                        writeFileSync(agentJsonPath, JSON.stringify(meta, null, 2), 'utf8');
+                        console.log(`[SETTINGS] Synced agent.json for '${agentName}'`);
+                    } catch (err) {
+                        console.warn(`[SETTINGS] Failed to sync agent.json for '${agentName}':`, err.message);
+                    }
+                }
                 agent.socket.emit('restart-agent');
             }
         });
@@ -266,6 +289,13 @@ export function createMindServer(host_public = false, port = 8080) {
 				console.error('Error: ', error);
 			}
 		});
+			socket.on('test-skin', (agentName, model, url) => {
+				const agent = agent_connections[agentName];
+				if (agent && agent.socket) {
+					agent.socket.emit('set-skin', model, url);
+				}
+			});
+
 
         socket.on('bot-output', (agentName, message) => {
             io.emit('bot-output', agentName, message);

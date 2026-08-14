@@ -13,7 +13,9 @@ import time
 
 # ── Config (env-overridable) ──────────────────────────────────────────────
 
-MINEBOT_DIR = os.getenv("MINEBOT_DIR", "E:/New Life/Minebot/mindcraft")
+# Mindcraft 已收敛进本仓库：默认指向 agent 内的 Minebot/mindcraft（可用 MINEBOT_DIR 覆盖）
+_AGENT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+MINEBOT_DIR = os.getenv("MINEBOT_DIR", os.path.join(_AGENT_ROOT, "Minebot", "mindcraft"))
 MINEBOT_HOST = os.getenv("MINEBOT_HOST", "127.0.0.1")
 MINEBOT_PORT = int(os.getenv("MINEBOT_PORT", "8080"))
 

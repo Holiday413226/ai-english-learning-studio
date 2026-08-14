@@ -64,8 +64,21 @@ export class SelfPrompter {
         const MAX_NO_COMMAND = 3;
         while (!this.interrupt) {
             const msg = `You are self-prompting with the goal: '${this.prompt}'. Your next response MUST contain a command with this syntax: !commandName. Respond:`;
-            
-            let used_command = await this.agent.handleMessage('system', msg, -1);
+
+            // ═══ Persona Behavior Pipeline — self_prompt must go through generateBehavior ═══
+            if (this.agent.persona) {
+                const { intent, plan } = this.agent.persona.generateBehavior(
+                    { type: 'idle', attention_score: 0.5 }, {}
+                );
+                this.agent.persona.setActiveBehavior(intent, plan);
+            }
+
+            let used_command = await this.agent.llmGate.run(
+                () => this.agent.handleMessage('system', msg, -1),
+                { throttled: true }
+            );
+            // llmGate returns null when busy — treat as no-command to skip iteration
+            if (used_command === null) used_command = false;
             if (!used_command) {
                 no_command_count++;
                 if (no_command_count >= MAX_NO_COMMAND) {

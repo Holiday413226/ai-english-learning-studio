@@ -1,7 +1,7 @@
 const settings = {
-    "minecraft_version": "1.21.11", // match your MC server
-    "host": "127.0.0.1",
-    "port": 52744,
+    "minecraft_version": "auto", // or specific version like "1.21.6"
+    "host": "127.0.0.1", // or "localhost", "your.ip.address.here"
+    "port": -1, // auto-scan for LAN open ports (PCL randomizes port each time)
     "auth": "offline", // or "microsoft"
 
     // the mindserver manages all agents and hosts the UI
@@ -10,7 +10,8 @@ const settings = {
     
     "base_profile": "assistant", // survival, assistant, creative, or god_mode
     "profiles": [
-    "./profiles/deepseek.json"
+    "./profiles/deepseek.json",
+    "./profiles/andy-4.json"
     ],
 
     "load_memory": false, // load memory from previous session
@@ -33,14 +34,17 @@ const settings = {
     "code_timeout_mins": -1, // minutes code is allowed to run. -1 for no timeout
     "relevant_docs_count": 5, // number of relevant code function docs to select for prompting. -1 for all
 
-    "max_messages": 15, // max number of messages to keep in context
-    "num_examples": 2, // number of examples to give to the model
+    "max_messages": 20, // max number of messages to keep in context
+    "num_examples": 4, // number of examples to give to the model
     "max_commands": -1, // max number of commands that can be used in consecutive responses. -1 for no limit
     "show_command_syntax": "full", // "full", "shortened", or "none"
     "narrate_behavior": true, // chat simple automatic actions ('Picking up item!')
     "chat_bot_messages": true, // publicly chat messages to other bots
 
-    "spawn_timeout": 30, // num seconds allowed for the bot to spawn before throwing error. Increase when spawning takes a while.
+    "skin_url": "",
+    "skin_model": "slim", // "slim" or "classic". Requires Fabric Tailor mod on server.
+    "agent_type": "temporary", // "temporary" or "persistent". Persistent agents are saved to disk and restored on restart.
+    "spawn_timeout": 60, // num seconds allowed for the bot to spawn before throwing error. Increase when spawning takes a while.
     "block_place_delay": 0, // delay between placing blocks (ms) if using newAction. helps avoid bot being kicked by anti-cheat mechanisms on servers.
   
     "log_all_prompts": false, // log ALL prompts to file

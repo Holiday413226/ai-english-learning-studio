@@ -4,6 +4,24 @@
         "required": true,
         "description": "The profile object to use, including name, prompts, and examples"
     },
+    "persona_id": {
+        "type": "string",
+        "default": "",
+        "required": false,
+        "description": "Persona ID for cross-world persistent identity. If empty, the agent name is used as persona ID."
+    },
+    "persona_backstory": {
+        "type": "string",
+        "default": "",
+        "required": false,
+        "description": "Character backstory injected into the system prompt as the immutable core identity."
+    },
+    "character_script": {
+        "type": "string",
+        "default": "",
+        "required": false,
+        "description": "Full character script (e.g. 'You are Yamada Ryo. From Tokyo. Love coffee. Hate violence.'). Injected into the [CHARACTER SCRIPT] section of the system prompt."
+    },
     "minecraft_version": {
         "type": "string",
         "description": "The version of Minecraft to use. Set to 'auto' to automatically detect the version.",
@@ -131,6 +149,25 @@
         "type": "object",
         "description": "The task object to give the agent on start. If null, the agent will not have a task.",
         "default": null
+    },
+    "agent_type": {
+        "type": "string",
+        "description": "Temporary agents disappear after mindserver restart. Persistent agents are saved to disk and can be restarted later.",
+        "default": "temporary",
+        "options": ["temporary", "persistent"]
+    },
+    "skin_url": {
+        "type": "string",
+        "default": "",
+        "required": false,
+        "description": "Skin image URL for the agent's Minecraft appearance. Requires Fabric Tailor mod on server."
+    },
+    "skin_model": {
+        "type": "string",
+        "default": "slim",
+        "required": false,
+        "options": ["slim", "classic"],
+        "description": "Skin model type: slim (Alex arms) or classic (Steve arms)."
     },
     "spawn_timeout": {
         "type": "number",

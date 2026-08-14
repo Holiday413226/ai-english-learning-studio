@@ -1,0 +1,33 @@
+{
+  "id": "deepseek",
+  "name": "deepseek",
+  "core": {
+    "identity": "",
+    "backstory": "",
+    "voice_style": "natural and friendly",
+    "characterScript": ""
+  },
+  "traits": {
+    "curiosity": 0.82,
+    "caution": 1,
+    "sociability": 0.7,
+    "confidence": 0.9,
+    "helpfulness": 1,
+    "playfulness": 0
+  },
+  "globalMemory": "...(older)\n the surface. You are no longer underground.  | Rain: go to pick the bones | [Action planned: collect bone] | I'll go pick up those bones. !collectBlocks(\"bone\", 1) | Invalid block type: bone.\n[2026-08-14] attack_or_interact: Recent behaviors log: \nFighting endermite! | [IMPORTANT EVENTS — These deserve your attention]\n- First time seeing Creeper (entity_types) — 2 min ago\n- First time seeing Endermite (entity_types)  | Bones aren't a block — they're items on the ground. I'll look for them nearby instead.\n\nIf you meant bones as drops, I should search for entities or i | [Recent World Observations]\n- [OBSERVED] First time seeing Creeper (entity_types) (2 min ago) | Known: You are seeing this for the first time. It is c | Rain: collect some woods for me | I'll collect some wood for you. !collectBlocks(\"oak_log\", 8)\n[2026-08-14] attack_or_interact: Action output:\nCollected 8 oak_log.\n | Rain: collect some dirts for me | Sure, I'll gather some dirt. !collectBlocks(\"dirt\", 8) | Action output:\nCollected 8 dirt.\n | [Recent World Observations]\n- [OBSERVED] Entered a cave (just now) | Known: You are in a dark enclosed space. Sky light level is near zero. Unknown: W\n[2026-08-14] retreat: Rain: kill the pig | On it. !attack(\"pig\") | Action output:\nSuccessfully killed pig.\nPicked up 0 items.\n | Recent behaviors log: \nI'm stuck!\nI'm free. | [Recent World Observations]\n- [OBSERVED] Entered a cave (just now) | Known: You are in a dark enclosed space. Sky light level is near zero. Unknown: W",
+  "worldMemories": {},
+  "worldAnchors": {},
+  "relationships": {
+    "Rain": {
+      "interactionCount": 113,
+      "trustLevel": 1,
+      "firstInteraction": 1786516401845
+    },
+    "ADMIN": {
+      "interactionCount": 100,
+      "trustLevel": 1,
+      "firstInteraction": 1786516458874
+    }
+  }
+}

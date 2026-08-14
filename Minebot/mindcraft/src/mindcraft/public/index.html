@@ -450,6 +450,7 @@
                 <div class="footer-left" id="agentSettingsFooter">Modify settings then apply to restart the agent.</div>
                 <div class="footer-actions">
                     <button id="discardAgentSettingsBtn" class="stop-btn" style="background:#777;">Discard Changes</button>
+                    <button id="testSkinBtn" class="stop-btn" style="background:#5c6bc0;" title="Send /skin set URL to agent without restarting">Test Skin</button>
                     <button id="applyAgentSettingsBtn" class="start-btn" disabled>Apply & Restart</button>
                 </div>
             </div>
@@ -555,7 +556,7 @@
             updateStatus(false);
         });
 
-        fetch('/settings_spec.json')
+        fetch('/settings_spec.json?t=' + Date.now())
             .then(r => r.json())
             .then(spec => {
                 settingsSpec = spec;
@@ -590,9 +591,20 @@
                         input.value = cfg.default;
                         break;
                     default:
-                        input = document.createElement('input');
-                        input.type = 'text';
-                        input.value = typeof cfg.default === 'object' ? JSON.stringify(cfg.default) : cfg.default;
+                        if (cfg.options) {
+                            input = document.createElement('select');
+                            cfg.options.forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt;
+                                option.textContent = opt;
+                                if (opt === cfg.default) option.selected = true;
+                                input.appendChild(option);
+                            });
+                        } else {
+                            input = document.createElement('input');
+                            input.type = 'text';
+                            input.value = typeof cfg.default === 'object' ? JSON.stringify(cfg.default) : cfg.default;
+                        }
                 }
                 input.title = cfg.description || '';
                 input.id = `setting-${key}`;
@@ -628,12 +640,18 @@
         });
 
         document.getElementById('submitCreateAgentBtn').addEventListener('click', () => {
-            if (!profileData) return;
+            console.log('[CREATE] Button clicked');
+            if (!profileData) {
+                console.warn('[CREATE] No profile uploaded — aborting');
+                document.getElementById('createError').textContent = 'Please upload a profile JSON file first.';
+                return;
+            }
+            console.log('[CREATE] Profile:', profileData.name);
             const settings = { profile: profileData };
             Object.keys(settingsSpec).forEach(key => {
                 if (key === 'profile') return;
                 const input = document.getElementById(`setting-${key}`);
-                if (!input) return;
+                if (!input) { console.warn('[CREATE] Input missing:', key); return; }
                 const type = settingsSpec[key].type;
                 let val;
                 if (type === 'boolean') val = input.checked;
@@ -644,11 +662,16 @@
                 } else val = input.value;
                 settings[key] = val;
             });
+            console.log('[CREATE] Emitting, keys:', Object.keys(settings).join(','));
+            document.getElementById('submitCreateAgentBtn').disabled = true;
+            document.getElementById('submitCreateAgentBtn').textContent = 'Creating...';
             socket.emit('create-agent', settings, res => {
-                if (!res.success) {
-                    document.getElementById('createError').textContent = res.error || 'Unknown error';
+                console.log('[CREATE] Server response:', res);
+                document.getElementById('submitCreateAgentBtn').disabled = false;
+                document.getElementById('submitCreateAgentBtn').textContent = 'Create Agent';
+                if (!res || !res.success) {
+                    document.getElementById('createError').textContent = (res && res.error) || 'No response from server — check if mindserver is running';
                 } else {
-                    // reset on success
                     profileData = null;
                     document.getElementById('submitCreateAgentBtn').disabled = true;
                     document.getElementById('profileStatus').textContent = 'Profile: Not uploaded';
@@ -823,10 +846,22 @@
                         input.value = settings[key] ?? cfg.default ?? 0;
                         break;
                     default:
-                        input = document.createElement('input');
-                        input.type = 'text';
-                        const defVal = settings[key] ?? cfg.default ?? '';
-                        input.value = typeof defVal === 'object' ? JSON.stringify(defVal) : defVal;
+                        if (cfg.options) {
+                            input = document.createElement('select');
+                            cfg.options.forEach(opt => {
+                                const option = document.createElement('option');
+                                option.value = opt;
+                                option.textContent = opt;
+                                const curVal = settings[key] ?? cfg.default;
+                                if (opt === curVal) option.selected = true;
+                                input.appendChild(option);
+                            });
+                        } else {
+                            input = document.createElement('input');
+                            input.type = 'text';
+                            const defVal = settings[key] ?? cfg.default ?? '';
+                            input.value = typeof defVal === 'object' ? JSON.stringify(defVal) : defVal;
+                        }
                 }
                 input.id = `agent-setting-${key}`;
                 input.addEventListener('input', onAgentSettingsChanged);
@@ -919,6 +954,30 @@
             agentSettings[currentAgentName] = { ...edited, fetched: true };
             updateAgentViewer(currentAgentName);
             closeAgentSettings();
+        });
+
+        // Test Skin button — send /skin set URL immediately without restart
+        const testSkinBtn = document.getElementById('testSkinBtn');
+        testSkinBtn.addEventListener('click', () => {
+            if (!currentAgentName) return;
+            const urlInput = document.getElementById('agent-setting-skin_url');
+            const modelInput = document.getElementById('agent-setting-skin_model');
+            const url = String(urlInput?.value || '').trim();
+            const model = String(modelInput?.value || 'slim').trim().toLowerCase();
+            if (!url || !/^https?:\/\//i.test(url)) {
+                document.getElementById('agentSettingsError').textContent = 'Please enter a valid HTTP(S) skin URL first.';
+                return;
+            }
+            document.getElementById('agentSettingsError').textContent = '';
+            socket.emit('test-skin', currentAgentName, model, url);
+            // Brief visual feedback
+            const originalText = testSkinBtn.textContent;
+            testSkinBtn.textContent = 'Skin Sent!';
+            testSkinBtn.disabled = true;
+            setTimeout(() => {
+                testSkinBtn.textContent = originalText;
+                testSkinBtn.disabled = false;
+            }, 1500);
         });
 
         closeAgentSettingsBtn.addEventListener('click', closeAgentSettings);

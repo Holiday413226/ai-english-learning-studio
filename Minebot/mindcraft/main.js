@@ -71,10 +71,10 @@ if (process.env.SETTINGS_JSON) {
 }
 
 
-Mindcraft.init(false, settings.mindserver_port, settings.auto_open_ui);
+await Mindcraft.init(false, settings.mindserver_port, settings.auto_open_ui);
 
 for (let profile of settings.profiles) {
     const profile_json = JSON.parse(readFileSync(profile, 'utf8'));
     settings.profile = profile_json;
-    Mindcraft.createAgent(settings);
+    Mindcraft.createAgent(settings); // fire-and-forget; each agent connects independently
 }
