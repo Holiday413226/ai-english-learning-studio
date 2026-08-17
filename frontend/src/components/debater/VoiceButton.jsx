@@ -1,10 +1,14 @@
 /**
- * VoiceButton — record button with animated waveform.
+ * VoiceButton — record button with animated waveform, language toggle,
+ * phone relay QR modal, and TTS voice gender toggle.
+ *
  * Uses useVoiceRecognition hook for Speech-to-Text.
  */
-import { useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import useVoiceRecognition from "../../hooks/useVoiceRecognition";
 import useDebaterStore, { VoiceState } from "../../systems/debater/store";
+import useConfigStore from "../../store/configStore";
+import PhoneRelayModal from "./PhoneRelayModal";
 
 export default function VoiceButton({ disabled, onResult }) {
   const canvasRef = useRef(null);
@@ -14,13 +18,23 @@ export default function VoiceButton({ disabled, onResult }) {
   const voiceState = useDebaterStore((s) => s.voiceState);
   const setVoiceState = useDebaterStore((s) => s.setVoiceState);
 
+  // ── TTS voice gender from global config ────────────────────
+  const ttsVoiceGender = useConfigStore((s) => s.ttsVoiceGender);
+  const setConfig = useConfigStore((s) => s.setConfig);
+
+  // ── ASR language toggle ────────────────────────────────────
+  const [asrLang, setAsrLang] = useState("zh-CN");
+
   const {
     isSupported,
     transcript,
     error: micError,
     startListening,
     stopListening,
-  } = useVoiceRecognition();
+  } = useVoiceRecognition(asrLang);
+
+  // ── Phone relay state ──────────────────────────────────────
+  const [relayOpen, setRelayOpen] = useState(false);
 
   // ── Waveform animation ────────────────────────────────────
   const startWaveform = useCallback(async () => {
@@ -93,13 +107,20 @@ export default function VoiceButton({ disabled, onResult }) {
 
   // Cleanup on unmount
   useEffect(() => {
-    return () => stopWaveform();
+    return () => {
+      stopWaveform();
+    };
   }, [stopWaveform]);
+
+  // Relay send handler
+  const handleRelaySend = useCallback((text) => {
+    onResult(text);
+  }, [onResult]);
 
   if (!isSupported) {
     return (
       <div className="debater-voice-unsupported">
-        <p>🎤 Voice requires Chrome browser</p>
+        <p>Voice requires Chrome browser</p>
       </div>
     );
   }
@@ -115,6 +136,53 @@ export default function VoiceButton({ disabled, onResult }) {
 
   return (
     <div className="debater-voice-area">
+      {/* ── Controls row: lang + gender + phone ─────────────── */}
+      <div className="debater-voice-controls">
+        <div className="debater-voice-lang">
+          <button
+            className={`debater-lang-btn ${asrLang === "zh-CN" ? "on" : ""}`}
+            onClick={() => setAsrLang("zh-CN")}
+            title="Chinese"
+          >
+            中
+          </button>
+          <button
+            className={`debater-lang-btn ${asrLang === "en-US" ? "on" : ""}`}
+            onClick={() => setAsrLang("en-US")}
+            title="English"
+          >
+            EN
+          </button>
+        </div>
+
+        <div className="debater-voice-gender">
+          <button
+            className={`debater-gender-btn ${ttsVoiceGender === "female" ? "on" : ""}`}
+            onClick={() => setConfig({ ttsVoiceGender: "female" })}
+            title="Female voice"
+          >
+            F
+          </button>
+          <button
+            className={`debater-gender-btn ${ttsVoiceGender === "male" ? "on" : ""}`}
+            onClick={() => setConfig({ ttsVoiceGender: "male" })}
+            title="Male voice"
+          >
+            M
+          </button>
+        </div>
+
+        <button
+          className="debater-phone-btn nes-btn is-primary"
+          onClick={() => setRelayOpen(true)}
+          title="Phone voice input"
+          style={{ fontSize: "0.65rem", padding: "2px 8px" }}
+        >
+          Phone
+        </button>
+      </div>
+
+      {/* ── Waveform ──────────────────────────────────────────── */}
       <canvas
         ref={canvasRef}
         className={`debater-waveform ${
@@ -123,6 +191,8 @@ export default function VoiceButton({ disabled, onResult }) {
         width={300}
         height={50}
       />
+
+      {/* ── Record button + status ────────────────────────────── */}
       <button
         className={`nes-btn debater-voice-btn ${
           voiceState === VoiceState.RECORDING ? "is-error" : "is-primary"
@@ -135,11 +205,18 @@ export default function VoiceButton({ disabled, onResult }) {
           voiceState === VoiceState.SPEAKING
         }
       >
-        {voiceState === VoiceState.RECORDING ? "⏹ Stop" : "🎤 Record"}
+        {voiceState === VoiceState.RECORDING ? "Stop" : "Record"}
       </button>
       <span className="debater-voice-status">
         {stateLabels[voiceState]}
       </span>
+
+      {/* ── Shared Phone Relay Modal ──────────────────────────── */}
+      <PhoneRelayModal
+        open={relayOpen}
+        onClose={() => setRelayOpen(false)}
+        onSend={handleRelaySend}
+      />
     </div>
   );
 }

@@ -15,7 +15,7 @@ POST   /api/minecraft/companion/refresh   — trigger session scan from disk
 from flask import request, jsonify
 from core.coze_client import chat_with_bot
 from systems.minecraft.session_storage import minecraft_storage
-from systems.minecraft.bridge import MinebotBridge
+from systems.minecraft.bridge import MinebotBridge, get_layers, set_layers
 
 
 def register_minecraft_routes(app):
@@ -170,6 +170,31 @@ def register_minecraft_routes(app):
         """
         count = minecraft_storage.scan_sessions()
         return jsonify({"status": "ok", "sessions_found": count})
+
+    # ── Layer selector endpoints ─────────────────────────────────────
+
+    @app.route("/api/minecraft/layers", methods=["GET"])
+    def minecraft_get_layers():
+        """Return the layer-selector config for the deepseek bot.
+
+        GET /api/minecraft/layers
+        → {profile: "deepseek", layers: {intent, persona_gate, expression, autonomy}}
+        """
+        return jsonify({"profile": "deepseek", "layers": get_layers()})
+
+    @app.route("/api/minecraft/layers", methods=["POST"])
+    def minecraft_set_layers():
+        """Update the layer-selector config for the deepseek bot.
+
+        Body: {layers: {intent: bool, persona_gate: bool, expression: bool, autonomy: bool}}
+        Returns: {status: "ok", layers: {...}} | {error: str}
+        Changes take effect after the Minebot process restarts.
+        """
+        data = request.get_json(silent=True) or {}
+        ok, message = set_layers(data.get("layers") or {})
+        if not ok:
+            return jsonify({"error": message}), 400
+        return jsonify({"status": "ok", "layers": get_layers()})
 
     # ── Bridge control endpoints ────────────────────────────────────
 

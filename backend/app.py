@@ -70,6 +70,13 @@ def create_app() -> Flask:
     from systems.minecraft.bridge import MinebotBridge
     app.minebot_bridge = MinebotBridge()
 
+    # ── Phone voice relay ──────────────────────────────────────
+    from speech.relay import register_relay_routes
+    register_relay_routes(app)
+
+    # Store port for relay QR code generation
+    app.config["SERVER_PORT"] = FLASK_PORT
+
     # ── Config / Keyring routes ─────────────────────────────────
     from systems.config.keyring_store import set_key, get_key, get_status, delete_all_keys
 

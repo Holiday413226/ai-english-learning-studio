@@ -13,6 +13,10 @@ export class SelfPrompter {
     }
 
     start(prompt) {
+        if (this.agent.layers && this.agent.layers.autonomy === false) {
+            console.log('[LAYERS] autonomy disabled — ignoring self-prompt start.');
+            return 'Autonomy layer disabled.';
+        }
         console.log('Self-prompting started.');
         if (!prompt) {
             if (!this.prompt)

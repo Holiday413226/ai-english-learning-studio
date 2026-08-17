@@ -1,9 +1,12 @@
 /**
  * SessionSidebar — left panel displaying past chat sessions.
  */
+import { useContext } from "react";
 import useDebaterStore from "../../systems/debater/store";
+import { SettingsContext } from "../../App";
 
-export default function SessionSidebar({ onSettingsOpen }) {
+export default function SessionSidebar({}) {
+  const { openSettings } = useContext(SettingsContext);
   const {
     sessions,
     currentSessionId,
@@ -31,10 +34,10 @@ export default function SessionSidebar({ onSettingsOpen }) {
         </button>
         <button
           className="nes-btn is-warning debater-settings-btn"
-          onClick={onSettingsOpen}
+          onClick={openSettings}
           title="Settings"
         >
-          ⚙
+          Settings
         </button>
       </div>
 
@@ -55,7 +58,7 @@ export default function SessionSidebar({ onSettingsOpen }) {
               onClick={() => setCurrentSessionId(id)}
             >
               <span className="debater-session-mode">
-                {session.mode === "debate" ? "⚔" : "💬"}
+                {session.mode === "debate" ? "D" : "C"}
               </span>
               <span className="debater-session-preview">{preview}</span>
               <button
@@ -68,7 +71,7 @@ export default function SessionSidebar({ onSettingsOpen }) {
                 }}
                 title="Delete session"
               >
-                ✕
+                x
               </button>
             </div>
           );

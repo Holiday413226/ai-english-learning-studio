@@ -8,19 +8,19 @@
     "characterScript": ""
   },
   "traits": {
-    "curiosity": 0.82,
+    "curiosity": 1,
     "caution": 1,
     "sociability": 0.7,
     "confidence": 0.9,
     "helpfulness": 1,
     "playfulness": 0
   },
-  "globalMemory": "...(older)\n the surface. You are no longer underground.  | Rain: go to pick the bones | [Action planned: collect bone] | I'll go pick up those bones. !collectBlocks(\"bone\", 1) | Invalid block type: bone.\n[2026-08-14] attack_or_interact: Recent behaviors log: \nFighting endermite! | [IMPORTANT EVENTS — These deserve your attention]\n- First time seeing Creeper (entity_types) — 2 min ago\n- First time seeing Endermite (entity_types)  | Bones aren't a block — they're items on the ground. I'll look for them nearby instead.\n\nIf you meant bones as drops, I should search for entities or i | [Recent World Observations]\n- [OBSERVED] First time seeing Creeper (entity_types) (2 min ago) | Known: You are seeing this for the first time. It is c | Rain: collect some woods for me | I'll collect some wood for you. !collectBlocks(\"oak_log\", 8)\n[2026-08-14] attack_or_interact: Action output:\nCollected 8 oak_log.\n | Rain: collect some dirts for me | Sure, I'll gather some dirt. !collectBlocks(\"dirt\", 8) | Action output:\nCollected 8 dirt.\n | [Recent World Observations]\n- [OBSERVED] Entered a cave (just now) | Known: You are in a dark enclosed space. Sky light level is near zero. Unknown: W\n[2026-08-14] retreat: Rain: kill the pig | On it. !attack(\"pig\") | Action output:\nSuccessfully killed pig.\nPicked up 0 items.\n | Recent behaviors log: \nI'm stuck!\nI'm free. | [Recent World Observations]\n- [OBSERVED] Entered a cave (just now) | Known: You are in a dark enclosed space. Sky light level is near zero. Unknown: W",
+  "globalMemory": "...(older)\nnow and hopefully spot any threats from further away.\n[2026-08-17] retreat: [Observation] The weather turned Clear. (Describe how you feel, not what you are doing. Do not invent actions.) | Great, it's still clear and bright out. That eases my mind a bit. Let's enjoy the open plains. | [Observation] The weather turned Clear. (Describe how you feel, not what you are doing. Do not invent actions.) | Clear weather again—that's reassuring. I feel much calmer out here in the open. | [Observation] The weather turned Clear. (Describe how you feel, not what you are doing. Do not invent actions.) | Still clear skies—I'm feeling more relaxed now. It's much easier to stay alert when I can see everything around me.\n[2026-08-17] retreat: [Observation] It's a quiet Afternoon, Plains. Weather is Clear. (Describe how you feel, not what you are doing. Do not invent actions.) | It's a peaceful afternoon here in the plains. I'm glad we're out of that cave and in this calm, open space. | [Observation] It's a quiet Afternoon, Plains. Weather is Clear. (Describe how you feel, not what you are doing. Do not invent actions.) | A quiet, clear afternoon in the plains—I'm enjoying this calm. It's a nice change from all that stress earlier. | [Observation] It's a quiet Afternoon, Plains. Weather is Clear. (Describe how you feel, not what you are doing. Do not invent actions.) | This peaceful afternoon is really soothing. I feel at ease out here with the clear weather—much better than creeper encounters.",
   "worldMemories": {},
   "worldAnchors": {},
   "relationships": {
     "Rain": {
-      "interactionCount": 113,
+      "interactionCount": 121,
       "trustLevel": 1,
       "firstInteraction": 1786516401845
     },

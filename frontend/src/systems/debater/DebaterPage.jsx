@@ -16,13 +16,13 @@
  * API keys and Bot IDs come from global configStore.
  * Messages and sessions are in the subsystem store.
  */
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useContext } from "react";
 import SessionSidebar from "../../components/debater/SessionSidebar";
-import SetupModal from "../../components/SetupModal";
 import ChatBubble from "../../components/debater/ChatBubble";
 import ChatInput from "../../components/debater/ChatInput";
 import useConfigStore from "../../store/configStore";
 import useDebaterStore, { VoiceState } from "./store";
+import { SettingsContext } from "../../App";
 import { postChat, getDebateScore, getSessions, getSession } from "./api";
 
 export default function DebaterPage() {
@@ -32,6 +32,8 @@ export default function DebaterPage() {
   const debateBotId = useConfigStore((s) => s.debateBotId);
   const discussBotId = useConfigStore((s) => s.discussBotId);
   const deepseekApiKey = useConfigStore((s) => s.deepseekApiKey);
+  const ttsVoiceGender = useConfigStore((s) => s.ttsVoiceGender);
+  const { openSettings } = useContext(SettingsContext);
 
   // ── Subsystem state ────────────────────────────────────────
   const {
@@ -46,8 +48,6 @@ export default function DebaterPage() {
     setVoiceState,
   } = useDebaterStore();
 
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsKey, setSettingsKey] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [voiceMode, setVoiceMode] = useState(false);
@@ -55,10 +55,10 @@ export default function DebaterPage() {
   const [scoreResult, setScoreResult] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // First-launch: if no COZE API key, force settings modal
+  // First-launch: if no COZE API key, open global settings
   useEffect(() => {
     if (!cozeApiKey && !debateBotId && !discussBotId) {
-      setSettingsOpen(true);
+      openSettings();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -239,16 +239,36 @@ export default function DebaterPage() {
     ]
   );
 
-  // Browser SpeechSynthesis fallback
-  const speakWithBrowserTTS = (text) => {
+  // Browser SpeechSynthesis fallback with voice gender selection
+  const speakWithBrowserTTS = useCallback((text) => {
     setVoiceState(VoiceState.SPEAKING);
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = "en-US";
     utterance.rate = 0.95;
     utterance.onend = () => setVoiceState(VoiceState.IDLE);
     utterance.onerror = () => setVoiceState(VoiceState.IDLE);
+
+    // Select voice by gender preference
+    const voices = speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      const enVoices = voices.filter((v) => v.lang.startsWith("en"));
+      if (ttsVoiceGender === "female") {
+        const female = enVoices.find((v) =>
+          v.name.includes("Zira") || v.name.includes("Susan")
+          || v.name.toLowerCase().includes("female")
+        );
+        if (female) utterance.voice = female;
+      } else {
+        const male = enVoices.find((v) =>
+          v.name.includes("David") || v.name.includes("Mark")
+          || v.name.toLowerCase().includes("male")
+        );
+        if (male) utterance.voice = male;
+      }
+    }
+
     speechSynthesis.speak(utterance);
-  };
+  }, [ttsVoiceGender, setVoiceState]);
 
   const currentMessages = currentSessionId
     ? sessions[currentSessionId]?.messages || []
@@ -256,24 +276,15 @@ export default function DebaterPage() {
 
   return (
     <div className="page-content debater-page">
-      <SetupModal
-        key={settingsKey}
-        open={settingsOpen}
-        onClose={() => {
-          setSettingsOpen(false);
-          setSettingsKey((k) => k + 1);
-        }}
-      />
-
       <header className="debater-header">
         <h1>
-          {mode === "debate" ? "⚔ AI Debater" : "💬 AI Discuss"}
+          {mode === "debate" ? "AI Debater" : "AI Discuss"}
         </h1>
         <p>COZE-powered English debate & discussion</p>
       </header>
 
       <main className="debater-main">
-        <SessionSidebar onSettingsOpen={() => setSettingsOpen(true)} />
+        <SessionSidebar />
 
         <div className="debater-chat">
           <div className="debater-messages">
@@ -309,8 +320,8 @@ export default function DebaterPage() {
             )}
 
             {error && (
-              <div className="debater-error nes-container is-rounded">
-                <p>⚠ {error}</p>
+              <div className="debater-error">
+                <p>{error}</p>
               </div>
             )}
 
@@ -319,15 +330,15 @@ export default function DebaterPage() {
               <div style={{ textAlign: "center", margin: "8px 0" }}>
                 <button
                   className="nes-btn is-success"
-                  style={{ fontSize: "0.5rem" }}
+                  style={{ fontSize: "0.75rem" }}
                   onClick={handleScore}
                   disabled={scoring || !deepseekApiKey}
                 >
-                  {scoring ? "⚙ Scoring..." : "📊 Score this Debate"}
+                  {scoring ? "Scoring..." : "Score this Debate"}
                 </button>
                 {!deepseekApiKey && (
-                  <p style={{ fontSize: "0.4rem", color: "#ff6b8a", marginTop: 4 }}>
-                    DeepSeek API Key required for scoring. Configure in Settings ⚙
+                  <p style={{ fontSize: "0.65rem", color: "var(--danger)", marginTop: 4 }}>
+                    DeepSeek API Key required for scoring. Configure in Settings.
                   </p>
                 )}
               </div>
@@ -336,8 +347,8 @@ export default function DebaterPage() {
             {/* ── Score Result ────────────────────────────────── */}
             {scoreResult && !scoreResult.error && (
               <div className="window" style={{ padding: "14px 18px", marginTop: 8 }}>
-                <h4 style={{ fontSize: "0.55rem", color: "#50fa7b", margin: "0 0 10px", fontFamily: "'Press Start 2P', monospace" }}>
-                  📊 Debate Score
+                <h4 style={{ fontSize: "0.8rem", color: "var(--accent)", margin: "0 0 10px", fontFamily: "var(--font-mono)" }}>
+                  Debate Score
                 </h4>
                 <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
                   {[
@@ -347,8 +358,8 @@ export default function DebaterPage() {
                     { k: "fluency", label: "Fluency", max: 10 },
                   ].map(({ k, label, max }) => (
                     <div key={k} style={{ flex: 1, textAlign: "center" }}>
-                      <div style={{ fontSize: "0.4rem", color: "#7a6a9a" }}>{label}</div>
-                      <div style={{ fontSize: "1rem", fontFamily: "'Press Start 2P', monospace", color: "#50fa7b" }}>
+                      <div style={{ fontSize: "0.6rem", color: "var(--text-muted)" }}>{label}</div>
+                      <div style={{ fontSize: "1rem", fontFamily: "var(--font-mono)", color: "var(--accent)" }}>
                         {scoreResult[k] ?? "-"}/{max}
                       </div>
                     </div>
@@ -356,10 +367,10 @@ export default function DebaterPage() {
                 </div>
                 {(scoreResult.suggestions || []).length > 0 && (
                   <div>
-                    <p style={{ fontSize: "0.45rem", color: "#9b8ab8", marginBottom: 4 }}>💡 Suggestions:</p>
+                    <p style={{ fontSize: "0.65rem", color: "var(--text-secondary)", marginBottom: 4 }}>Suggestions:</p>
                     {scoreResult.suggestions.map((s, i) => (
-                      <p key={i} style={{ fontSize: "0.45rem", color: "#6a5a8a", margin: "2px 0", paddingLeft: 8 }}>
-                        • {s}
+                      <p key={i} style={{ fontSize: "0.65rem", color: "var(--text-muted)", margin: "2px 0", paddingLeft: 8 }}>
+                        - {s}
                       </p>
                     ))}
                   </div>
@@ -368,8 +379,8 @@ export default function DebaterPage() {
             )}
 
             {scoreResult?.error && (
-              <div className="debater-error nes-container is-rounded">
-                <p>⚠ Score failed: {scoreResult.error}</p>
+              <div className="debater-error">
+                <p>Score failed: {scoreResult.error}</p>
               </div>
             )}
 

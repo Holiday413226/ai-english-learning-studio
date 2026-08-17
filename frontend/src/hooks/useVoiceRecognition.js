@@ -7,7 +7,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 const SpeechRecognition =
   window.SpeechRecognition || window.webkitSpeechRecognition;
 
-export default function useVoiceRecognition() {
+export default function useVoiceRecognition(lang = "zh-CN") {
   const recognitionRef = useRef(null);
   const [isSupported] = useState(!!SpeechRecognition);
   const [isListening, setIsListening] = useState(false);
@@ -20,7 +20,7 @@ export default function useVoiceRecognition() {
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
-    recognition.lang = "en-US";
+    recognition.lang = lang;
 
     recognition.onresult = (event) => {
       const result = event.results[0][0].transcript;

@@ -47,10 +47,10 @@ export default function NovelInput({ novelText, setNovelText, ready, setReady })
       >
         {novelText ? (
           <p>
-            📄 <strong>{fileName}</strong> — {charCount.toLocaleString()} characters
+            <strong>{fileName}</strong> — {charCount.toLocaleString()} characters
           </p>
         ) : (
-          <p>📂 Drag &amp; drop a Chinese novel .txt file here, or click to browse</p>
+          <p>Drag & drop a Chinese novel .txt file here, or click to browse</p>
         )}
         <input
           ref={fileInputRef}
@@ -68,7 +68,7 @@ export default function NovelInput({ novelText, setNovelText, ready, setReady })
         disabled={!novelText}
         onClick={() => setReady((r) => !r)}
       >
-        {ready ? "✅ Ready — Click to unready" : "📌 Ready"}
+        {ready ? "Ready — Click to unready" : "Ready"}
       </button>
     </>
   );

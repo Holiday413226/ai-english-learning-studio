@@ -13,7 +13,7 @@ export default function ChatBubble({ message, isTyping, apiKey }) {
   return (
     <div className={`debater-bubble ${isUser ? "debater-bubble--user" : ""}`}>
       <div className="debater-bubble-avatar">
-        {isUser ? "👤" : "🤖"}
+        {isUser ? "Y" : "AI"}
       </div>
       <div
         className={`debater-bubble-content ${isUser ? "is-user" : "is-ai"}`}
@@ -42,7 +42,7 @@ export default function ChatBubble({ message, isTyping, apiKey }) {
             onClick={() => new Audio(message.audioUrl).play()}
             title="Play voice response"
           >
-            🔊 Play
+            Play
           </button>
         )}
       </div>

@@ -15,19 +15,19 @@ export default function ReaderModal({ htmlContent, highlightCount, onClose }) {
     >
       <div className="reader-container">
         <div className="reader-header">
-          <h2>📖 Full-Screen Reader</h2>
+          <h2>Full-Screen Reader</h2>
           <span className="reader-stats">
-            🟦 {highlightCount} vocab words highlighted
+            {highlightCount} vocab words highlighted
           </span>
           <button
             type="button"
             className="nes-btn is-error reader-close"
             onClick={onClose}
           >
-            ✕ Close
+            Close
           </button>
         </div>
-        <div className="reader-body nes-container is-rounded">
+        <div className="reader-body">
           <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
         </div>
       </div>

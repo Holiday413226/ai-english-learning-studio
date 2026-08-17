@@ -90,3 +90,24 @@ export async function stopMinebotBridge() {
   const resp = await fetch(`${API_BASE}/bridge/stop`, { method: "POST" });
   return resp.json();
 }
+
+// ── Layer selector endpoints ────────────────────────────────────
+
+export async function getLayers() {
+  const resp = await fetch(`${API_BASE}/layers`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
+export async function setLayers(layers) {
+  const resp = await fetch(`${API_BASE}/layers`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ layers }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) {
+    throw new Error(data.error || `HTTP ${resp.status}`);
+  }
+  return data;
+}

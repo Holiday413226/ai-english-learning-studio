@@ -51,7 +51,7 @@ export default function DiaryPage() {
   return (
     <div className="page-content">
       <header>
-        <h1>✍️ English Diary</h1>
+        <h1>English Diary</h1>
         <p>Write daily · AI corrections · build your writing habit</p>
       </header>
 
@@ -61,14 +61,14 @@ export default function DiaryPage() {
         <div className="window window-col" style={{ minWidth: 280 }}>
           <h3 className="window-title">{todayStr()}</h3>
 
-          <div style={{ fontSize: "0.5rem", color: "#7a6a9a", marginBottom: 10 }}>
-            <span style={{ color: "#50fa7b" }}>Prompt: </span>
+          <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 10 }}>
+            <span style={{ color: "var(--accent)" }}>Prompt: </span>
             {prompt}
           </div>
 
           <textarea
             className="nes-textarea debater-text-input"
-            style={{ flex: 1, minHeight: 180, fontFamily: "'Microsoft YaHei', monospace", fontSize: "0.6rem" }}
+            style={{ flex: 1, minHeight: 180, fontFamily: "var(--font-sans)", fontSize: "0.85rem" }}
             placeholder="Start writing your diary in English..."
             value={text}
             onChange={(e) => { setText(e.target.value); setSubmitted(false); }}
@@ -80,12 +80,12 @@ export default function DiaryPage() {
             onClick={handleSubmit}
             disabled={loading || !text.trim() || !deepseekApiKey}
           >
-            {loading ? "⌛ Analyzing..." : "✅ Submit for Review"}
+            {loading ? "Analyzing..." : "Submit for Review"}
           </button>
 
           {!deepseekApiKey && (
-            <p style={{ fontSize: "0.45rem", color: "#ff6b8a", marginTop: 6 }}>
-              DeepSeek API Key required. Configure in Settings ⚙
+            <p style={{ fontSize: "0.65rem", color: "var(--danger)", marginTop: 6 }}>
+              DeepSeek API Key required. Configure in Settings.
             </p>
           )}
         </div>
@@ -95,8 +95,8 @@ export default function DiaryPage() {
           <h3 className="window-title">Corrections & Score</h3>
 
           {error && (
-            <div className="debater-error nes-container is-rounded">
-              <p>⚠ {error}</p>
+            <div className="debater-error">
+              <p>{error}</p>
             </div>
           )}
 
@@ -112,15 +112,15 @@ export default function DiaryPage() {
               {/* Score card */}
               <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
                 {[
-                  { k: "grammar", label: "Grammar", color: "#50fa7b" },
-                  { k: "vocabulary", label: "Vocab", color: "#87ceeb" },
+                  { k: "grammar", label: "Grammar", color: "var(--accent)" },
+                  { k: "vocabulary", label: "Vocab", color: "var(--highlight)" },
                   { k: "fluency", label: "Fluency", color: "#ffd700" },
                 ].map(({ k, label, color }) => (
                   <div key={k} style={{ flex: 1, textAlign: "center" }}>
-                    <div style={{ fontSize: "0.4rem", color: "#7a6a9a", fontFamily: "'Press Start 2P', monospace" }}>
+                    <div style={{ fontSize: "0.6rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
                       {label}
                     </div>
-                    <div style={{ fontSize: "1.2rem", fontFamily: "'Press Start 2P', monospace", color, textShadow: `2px 2px 0 #0d400d` }}>
+                    <div style={{ fontSize: "1.2rem", fontFamily: "var(--font-mono)", color, textShadow: "0 0 8px rgba(80, 250, 123, 0.15)" }}>
                       {result.score?.[k] ?? "-"}
                     </div>
                   </div>
@@ -129,17 +129,17 @@ export default function DiaryPage() {
 
               {/* Corrections */}
               {(result.corrections || []).map((c, ci) => (
-                <div key={ci} style={{ marginBottom: 10, fontSize: "0.5rem" }}>
-                  <p style={{ color: "#6a5a8a", textDecoration: "line-through", margin: "0 0 3px" }}>
+                <div key={ci} style={{ marginBottom: 10, fontSize: "0.75rem" }}>
+                  <p style={{ color: "var(--text-muted)", textDecoration: "line-through", margin: "0 0 3px" }}>
                     {c.sentence || c.original}
                   </p>
                   {(c.issues || []).map((iss, ii) => (
-                    <div key={ii} style={{ fontSize: "0.45rem", marginBottom: 4, paddingLeft: 10 }}>
-                      <span style={{ color: "#ff6b8a" }}>{iss.original}</span>
-                      <span style={{ color: "#9b8ab8" }}> → </span>
-                      <span style={{ color: "#50fa7b" }}>{iss.suggestion}</span>
+                    <div key={ii} style={{ fontSize: "0.7rem", marginBottom: 4, paddingLeft: 10 }}>
+                      <span style={{ color: "var(--danger)" }}>{iss.original}</span>
+                      <span style={{ color: "var(--text-secondary)" }}> → </span>
+                      <span style={{ color: "var(--accent)" }}>{iss.suggestion}</span>
                       <br />
-                      <span style={{ color: "#6a5a8a" }}>{iss.reason}</span>
+                      <span style={{ color: "var(--text-muted)" }}>{iss.reason}</span>
                     </div>
                   ))}
                 </div>
@@ -147,13 +147,13 @@ export default function DiaryPage() {
 
               {/* Highlighted expressions with VocabStar */}
               {(result.highlighted_expressions || []).length > 0 && (
-                <div style={{ marginTop: 14, borderTop: "2px solid #3d1a60", paddingTop: 10 }}>
-                  <p style={{ fontSize: "0.45rem", color: "#50fa7b", fontFamily: "'Press Start 2P', monospace", marginBottom: 6 }}>
-                    ⭐ Highlighted Expressions
+                <div style={{ marginTop: 14, borderTop: "1px solid var(--border-default)", paddingTop: 10 }}>
+                  <p style={{ fontSize: "0.65rem", color: "var(--accent)", fontFamily: "var(--font-mono)", marginBottom: 6 }}>
+                    Highlighted Expressions
                   </p>
                   {result.highlighted_expressions.map((expr, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                      <span style={{ fontSize: "0.55rem", color: "#87ceeb" }}>{expr}</span>
+                      <span style={{ fontSize: "0.8rem", color: "var(--highlight)" }}>{expr}</span>
                       <VocabStar
                         word={expr}
                         context={expr}
@@ -166,7 +166,7 @@ export default function DiaryPage() {
               )}
 
               {!result.corrections?.length && !result.highlighted_expressions?.length && submitted && (
-                <p style={{ fontSize: "0.5rem", color: "#6a5a8a", textAlign: "center" }}>
+                <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", textAlign: "center" }}>
                   Your submission has been reviewed. No major issues found!
                 </p>
               )}

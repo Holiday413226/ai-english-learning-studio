@@ -446,4 +446,12 @@ export function initModes(agent) {
     if (modes_json) {
         agent.bot.modes.loadJson(modes_json);
     }
+    // Layer selector: autonomy OFF → disable proactive autonomous modes.
+    // Reactive safety modes (self_preservation, unstuck, self_defense) stay on.
+    if (agent.layers && agent.layers.autonomy === false) {
+        for (const m of ['hunting', 'item_collecting', 'torch_placing', 'elbow_room']) {
+            agent.bot.modes.setOn(m, false);
+        }
+        console.log('[LAYERS] autonomy disabled — proactive modes forced off');
+    }
 }

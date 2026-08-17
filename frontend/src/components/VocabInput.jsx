@@ -33,7 +33,7 @@ export default function VocabInput({ vocabText, setVocabText, ready, setReady })
 
   return (
     <>
-      <h3 className="window-title">📝 Step 2 — Upload CET-4/6 Vocabulary (.txt)</h3>
+      <h3 className="window-title">Step 2 — Upload CET-4/6 Vocabulary (.txt)</h3>
       <div
         className={`drop-zone ${dragOver ? "drag-over" : ""} ${vocabText ? "has-file" : ""}`}
         onDragOver={(e) => {
@@ -51,10 +51,10 @@ export default function VocabInput({ vocabText, setVocabText, ready, setReady })
       >
         {vocabText ? (
           <p>
-            📄 <strong>{fileName}</strong> — {vocabCount} vocabulary words
+            <strong>{fileName}</strong> — {vocabCount} vocabulary words
           </p>
         ) : (
-          <p>📂 Drag &amp; drop a vocabulary .txt file here, or click to browse</p>
+          <p>Drag & drop a vocabulary .txt file here, or click to browse</p>
         )}
         <input
           ref={fileInputRef}
@@ -72,7 +72,7 @@ export default function VocabInput({ vocabText, setVocabText, ready, setReady })
         disabled={!vocabText}
         onClick={() => setReady((r) => !r)}
       >
-        {ready ? "✅ Ready — Click to unready" : "📌 Ready"}
+        {ready ? "Ready — Click to unready" : "Ready"}
       </button>
     </>
   );

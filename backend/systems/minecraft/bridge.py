@@ -4,6 +4,7 @@ Deliberately minimal: no history import, no Socket.IO, no file scanning.
 The external MindServer handles its own UI via settings.auto_open_ui.
 """
 
+import json
 import os
 import socket
 import subprocess
@@ -27,6 +28,66 @@ def _is_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
             return True
     except (ConnectionRefusedError, OSError):
         return False
+
+
+# ── Layer selector — read/write the deepseek profile's `layers` field ──────
+# The 4 toggleable layers sit over the always-on base (literal !command + skills).
+# Changes only take effect after the Mindcraft process restarts.
+
+DEFAULT_LAYERS = {
+    "intent": True,       # Cognitive LLM → structured action proposal
+    "persona_gate": True, # Persona accept/reject/modify decision gate
+    "expression": True,   # Expression LLM → natural-language narration
+    "autonomy": True,     # SelfPrompter + proactive autonomous modes
+}
+
+PROFILE_NAME = "deepseek"
+
+
+def _profile_path(name: str = PROFILE_NAME) -> str:
+    return os.path.join(MINEBOT_DIR, "profiles", f"{name}.json")
+
+
+def _read_profile(name: str = PROFILE_NAME) -> dict:
+    path = _profile_path(name)
+    if not os.path.isfile(path):
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def get_layers() -> dict:
+    """Return the deepseek profile's layers, merged over defaults."""
+    layers = dict(DEFAULT_LAYERS)
+    layers.update(_read_profile().get("layers") or {})
+    return layers
+
+
+def set_layers(layers: dict) -> tuple:
+    """Write the deepseek profile's `layers` field. Returns (ok, message)."""
+    path = _profile_path()
+    profile = _read_profile()
+    if not profile:
+        return False, f"Profile not found or unreadable: {path}"
+
+    clean = {}
+    for key in DEFAULT_LAYERS:
+        if key in layers and isinstance(layers[key], bool):
+            clean[key] = layers[key]
+    if not clean:
+        return False, "No valid layer keys provided (expected boolean values)."
+
+    profile["layers"] = clean
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(profile, f, ensure_ascii=False, indent=4)
+    except OSError as exc:
+        return False, f"Cannot write profile: {exc}"
+
+    return True, ""
 
 
 # ═══════════════════════════════════════════════════════════════════════════

@@ -8,9 +8,8 @@ export default function OutputDisplay({ result, loading, error }) {
   if (loading) {
     return (
       <>
-        <h3 className="window-title">📖 Translation Output</h3>
+        <h3 className="window-title">Translation Output</h3>
         <div className="loading-box">
-          <i className="nes-icon coin is-medium"></i>
           <p>AI is translating your novel... please wait</p>
           <progress className="nes-progress is-primary" max="100"></progress>
         </div>
@@ -21,9 +20,9 @@ export default function OutputDisplay({ result, loading, error }) {
   if (error) {
     return (
       <>
-        <h3 className="window-title">📖 Translation Output</h3>
-        <div className="error-box nes-container is-rounded is-dark">
-          <p>❌ {error}</p>
+        <h3 className="window-title">Translation Output</h3>
+        <div className="error-box">
+          <p>{error}</p>
         </div>
       </>
     );
@@ -32,9 +31,9 @@ export default function OutputDisplay({ result, loading, error }) {
   if (!result) {
     return (
       <>
-        <h3 className="window-title">📖 Translation Output</h3>
+        <h3 className="window-title">Translation Output</h3>
         <div className="placeholder-box">
-          <p>📋 Translated text will appear here after you press both Ready buttons...</p>
+          <p>Translated text will appear here after you press both Ready buttons...</p>
         </div>
       </>
     );
@@ -58,10 +57,10 @@ export default function OutputDisplay({ result, loading, error }) {
 
   return (
     <>
-      <h3 className="window-title">📖 Translation Output</h3>
+      <h3 className="window-title">Translation Output</h3>
 
       <div
-        className="output-area nes-container is-rounded"
+        className="output-area"
         onClick={() => setModalOpen(true)}
         role="button"
         tabIndex={0}
@@ -75,14 +74,14 @@ export default function OutputDisplay({ result, loading, error }) {
 
       <div className="output-actions">
         <span className="highlight-count">
-          🟦 {result.highlights.length} CET-4/6 vocabulary words highlighted
+          {result.highlights.length} CET-4/6 vocabulary words highlighted
         </span>
         <button
           type="button"
           className="nes-btn is-primary block-btn"
           onClick={handleDownload}
         >
-          💾 Download Translated TXT
+          Download Translated TXT
         </button>
       </div>
 

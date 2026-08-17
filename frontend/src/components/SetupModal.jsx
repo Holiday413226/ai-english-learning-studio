@@ -14,7 +14,7 @@
  * On mount, keys are restored from backend for security (no plaintext in localStorage).
  * On save, keys are written to both Zustand and backend.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import useConfigStore from "../store/configStore";
 
 const KEY_MAP = {
@@ -25,7 +25,7 @@ const KEY_MAP = {
   minecraftBotId: "minecraft_bot_id",
 };
 
-export default function SetupModal({ open, onClose, restoredKeys }) {
+export default function SetupModal({ open, onClose, restoredKeys, onGlitchTrigger }) {
   const config = useConfigStore();
 
   const [cozeApiKey, setCozeApiKey] = useState(config.cozeApiKey);
@@ -34,9 +34,21 @@ export default function SetupModal({ open, onClose, restoredKeys }) {
   const [debateBotId, setDebateBotId] = useState(config.debateBotId);
   const [discussBotId, setDiscussBotId] = useState(config.discussBotId);
   const [minecraftBotId, setMinecraftBotId] = useState(config.minecraftBotId);
+  const [ttsVoiceGender, setTtsVoiceGender] = useState(config.ttsVoiceGender);
   const [showKey, setShowKey] = useState(false);
   const [saveError, setSaveError] = useState(null);
   const [keyStatus, setKeyStatus] = useState({});  // backend keyring status
+
+  const cageRef = useRef(null);
+  const rafRef = useRef(null);
+  const angleRef = useRef(0);
+  const hoverTargetRef = useRef(null);
+  const hoverStartAngleRef = useRef(0);
+  const hoverStartTimeRef = useRef(0);
+  const lastTimeRef = useRef(0);
+
+  const NORMAL_SPEED = 18;        // 360° / 20s = 18°/s
+  const HOVER_DURATION = 0.55;    // target time to complete remaining rotation (seconds)
 
   // Fetch backend keyring status on mount + when modal opens
   useEffect(() => {
@@ -56,9 +68,80 @@ export default function SetupModal({ open, onClose, restoredKeys }) {
       setDebateBotId(restoredKeys?.debateBotId || config.debateBotId);
       setDiscussBotId(restoredKeys?.discussBotId || config.discussBotId);
       setMinecraftBotId(restoredKeys?.minecraftBotId || config.minecraftBotId);
+      setTtsVoiceGender(config.ttsVoiceGender);
       setSaveError(null);
     }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── 3D Cage rotation via requestAnimationFrame ──────────
+  useEffect(() => {
+    if (!open) return;
+
+    const cage = cageRef.current;
+    if (!cage) return;
+
+    lastTimeRef.current = performance.now();
+
+    function tick(now) {
+      const dt = Math.min((now - lastTimeRef.current) / 1000, 0.1);
+      lastTimeRef.current = now;
+
+      let angle = angleRef.current;
+
+      if (hoverTargetRef.current !== null) {
+        const elapsed = (now - hoverStartTimeRef.current) / 1000;
+        const remaining = hoverTargetRef.current - angle;
+        if (remaining <= 0.5) {
+          angle = hoverTargetRef.current;
+        } else {
+          let speed = remaining / Math.max(HOVER_DURATION - elapsed, 0.05);
+          speed = Math.max(speed, NORMAL_SPEED * 2);
+          angle += speed * dt;
+          if (angle >= hoverTargetRef.current) angle = hoverTargetRef.current;
+        }
+      } else {
+        angle += NORMAL_SPEED * dt;
+      }
+
+      angleRef.current = angle;
+
+      const xTilt = Math.sin(angle * Math.PI / 180) * 4;
+      cage.style.transform = 'rotateY(' + angle + 'deg) rotateX(' + xTilt + 'deg)';
+
+      rafRef.current = requestAnimationFrame(tick);
+    }
+
+    rafRef.current = requestAnimationFrame(tick);
+
+    const handleEnter = () => {
+      const a = angleRef.current;
+      hoverStartAngleRef.current = a;
+      let target = Math.ceil(a / 360) * 360;
+      if (target <= a) target += 360;
+      hoverTargetRef.current = target;
+      hoverStartTimeRef.current = performance.now();
+    };
+
+    const handleLeave = () => {
+      hoverTargetRef.current = null;
+    };
+
+    cage.addEventListener('mouseenter', handleEnter);
+    cage.addEventListener('mouseleave', handleLeave);
+
+    return () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      cage.removeEventListener('mouseenter', handleEnter);
+      cage.removeEventListener('mouseleave', handleLeave);
+    };
+  }, [open]);
+
+  const handleClose = () => {
+    onClose();
+    if (onGlitchTrigger) {
+      setTimeout(() => onGlitchTrigger(), 50);
+    }
+  };
 
   const handleSave = async () => {
     setSaveError(null);
@@ -71,6 +154,7 @@ export default function SetupModal({ open, onClose, restoredKeys }) {
         debateBotId: debateBotId.trim(),
         discussBotId: discussBotId.trim(),
         minecraftBotId: minecraftBotId.trim(),
+        ttsVoiceGender,
       });
 
       // 2. Save to backend keyring_store for EXE restart survival
@@ -95,6 +179,9 @@ export default function SetupModal({ open, onClose, restoredKeys }) {
       setSaveError(`Save failed: ${err.message || err}`);
       return;
     }
+    if (onGlitchTrigger) {
+      setTimeout(() => onGlitchTrigger(), 50);
+    }
     onClose();
   };
 
@@ -110,124 +197,193 @@ export default function SetupModal({ open, onClose, restoredKeys }) {
   return (
     <div
       className="debater-modal-overlay"
-      onClick={isFirstLaunch ? undefined : onClose}
+      onClick={isFirstLaunch ? undefined : handleClose}
     >
-      <div
-        className="debater-modal nes-container is-rounded"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h2 className="debater-modal-title">⚙ Settings</h2>
-
-        {/* ── DeepSeek (Novel) ──────────────────────────────── */}
-        <fieldset className="debater-modal-fieldset">
-          <legend>📖 Novel Translator (DeepSeek)</legend>
-          <div className="debater-modal-field">
-            <label>DeepSeek API Key</label>
-            <div className="debater-modal-key-row">
-              <input
-                type={showKey ? "text" : "password"}
-                className="nes-input"
-                placeholder="sk-xxxxxxxxxxxxxxxxxxxx"
-                value={deepseekApiKey}
-                onChange={(e) => setDeepseekApiKey(e.target.value)}
-              />
+      <div className="modal-cage" ref={cageRef}>
+        <div className="cage-ring flower-a"></div>
+        <div className="cage-ring flower-a"></div>
+        <div className="cage-ring flower-a"></div>
+        <div className="cage-ring flower-a"></div>
+        <div className="cage-ring flower-a"></div>
+        <div className="cage-ring flower-a"></div>
+        <div className="cage-ring flower-b"></div>
+        <div className="cage-ring flower-b"></div>
+        <div className="cage-ring flower-b"></div>
+        <div className="cage-ring flower-b"></div>
+        <div className="cage-ring flower-b"></div>
+        <div className="cage-ring flower-b"></div>
+        <div
+          className="debater-modal-setup"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Navi Wireframe Globe */}
+          <div className="globe-container">
+            <div className="globe">
+              <div className="ring ring-y"></div>
+              <div className="ring ring-y"></div>
+              <div className="ring ring-y"></div>
+              <div className="ring ring-y"></div>
+              <div className="ring ring-y"></div>
+              <div className="ring ring-y"></div>
+              <div className="ring ring-x"></div>
+              <div className="ring ring-x"></div>
+              <div className="ring ring-x"></div>
+              <div className="ring ring-x"></div>
+              <div className="ring ring-x"></div>
+              <div className="ring ring-x"></div>
+              <div className="ring ring-d"></div>
+              <div className="ring ring-d"></div>
+              <span className="pixel-dot"></span>
+              <span className="pixel-dot"></span>
+              <span className="pixel-dot"></span>
+              <span className="pixel-dot"></span>
+              <span className="pixel-dot"></span>
             </div>
           </div>
-        </fieldset>
 
-        {/* ── COZE (Debater + Minecraft) ────────────────────── */}
-        <fieldset className="debater-modal-fieldset">
-          <legend>⚔💬⛏ COZE Chat (Debater + Minecraft)</legend>
-          <div className="debater-modal-field">
-            <label>COZE API Key</label>
-            <div className="debater-modal-key-row">
-              <input
-                type={showKey ? "text" : "password"}
-                className="nes-input"
-                placeholder="pat_xxxxxxxxxxxxxxxxxxxx"
-                value={cozeApiKey}
-                onChange={(e) => setCozeApiKey(e.target.value)}
-              />
+          <h2 className="debater-modal-title">Settings</h2>
+
+          {/* ── Two-column layout ──────────────────────────────── */}
+          <div className="setup-modal-columns">
+
+            {/* ── Left: DeepSeek (Novel) ───────────────────────── */}
+            <fieldset className="debater-modal-fieldset">
+              <legend>Novel Translator (DeepSeek)</legend>
+              <div className="debater-modal-field">
+                <label>DeepSeek API Key</label>
+                <input
+                  type={showKey ? "text" : "password"}
+                  className="nes-input"
+                  placeholder="sk-xxxxxxxxxxxxxxxxxxxx"
+                  value={deepseekApiKey}
+                  onChange={(e) => setDeepseekApiKey(e.target.value)}
+                />
+              </div>
+            </fieldset>
+
+            {/* ── Right: COZE (Debater + Minecraft) ────────────── */}
+            <fieldset className="debater-modal-fieldset">
+              <legend>COZE Chat (Debater + Minecraft)</legend>
+              <div className="debater-modal-field">
+                <label>COZE API Key</label>
+                <div className="debater-modal-key-row">
+                  <input
+                    type={showKey ? "text" : "password"}
+                    className="nes-input"
+                    placeholder="pat_xxxxxxxxxxxxxxxxxxxx"
+                    value={cozeApiKey}
+                    onChange={(e) => setCozeApiKey(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="nes-btn is-warning"
+                    onClick={() => setShowKey((v) => !v)}
+                    style={{ padding: "0 8px" }}
+                  >
+                    {showKey ? "Hide" : "Show"}
+                  </button>
+                </div>
+              </div>
+
+              <div className="debater-modal-field">
+                <label>COZE API URL</label>
+                <input
+                  type="text"
+                  className="nes-input"
+                  placeholder="https://api.coze.cn (default)"
+                  value={cozeApiUrl}
+                  onChange={(e) => setCozeApiUrl(e.target.value)}
+                />
+                <small style={{ color: "#888", fontSize: "0.6rem" }}>
+                  Leave empty for default (api.coze.cn). Use api.coze.com for global.
+                </small>
+              </div>
+
+              <div className="debater-modal-field">
+                <label>Debate Bot ID</label>
+                <input
+                  type="text"
+                  className="nes-input"
+                  placeholder="bot_xxxxxxxxxxxxxxxxxxxx"
+                  value={debateBotId}
+                  onChange={(e) => setDebateBotId(e.target.value)}
+                />
+              </div>
+
+              <div className="debater-modal-field">
+                <label>Discuss Bot ID</label>
+                <input
+                  type="text"
+                  className="nes-input"
+                  placeholder="bot_xxxxxxxxxxxxxxxxxxxx"
+                  value={discussBotId}
+                  onChange={(e) => setDiscussBotId(e.target.value)}
+                />
+              </div>
+
+              <div className="debater-modal-field">
+                <label>Minecraft Bot ID</label>
+                <input
+                  type="text"
+                  className="nes-input"
+                  placeholder="bot_xxxxxxxxxxxxxxxxxxxx"
+                  value={minecraftBotId}
+                  onChange={(e) => setMinecraftBotId(e.target.value)}
+                />
+              </div>
+            </fieldset>
+          </div>
+
+          {/* ── Voice Preferences ──────────────────────────────── */}
+          <fieldset className="debater-modal-fieldset setup-modal-voice">
+            <legend>AI Voice Output</legend>
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+              <label style={{ fontSize: "0.7rem", color: "var(--text-primary)" }}>TTS Voice:</label>
               <button
                 type="button"
-                className="nes-btn is-warning"
-                onClick={() => setShowKey((v) => !v)}
+                className={`nes-btn ${ttsVoiceGender === "female" ? "is-primary" : ""}`}
+                style={{ fontSize: "0.65rem" }}
+                onClick={() => setTtsVoiceGender("female")}
               >
-                {showKey ? "🙈" : "👁"}
+                Female
+              </button>
+              <button
+                type="button"
+                className={`nes-btn ${ttsVoiceGender === "male" ? "is-primary" : ""}`}
+                style={{ fontSize: "0.65rem" }}
+                onClick={() => setTtsVoiceGender("male")}
+              >
+                Male
               </button>
             </div>
-          </div>
-
-          <div className="debater-modal-field">
-            <label>COZE API URL</label>
-            <input
-              type="text"
-              className="nes-input"
-              placeholder="https://api.coze.cn (default)"
-              value={cozeApiUrl}
-              onChange={(e) => setCozeApiUrl(e.target.value)}
-            />
-            <small style={{ color: "#888", fontSize: "0.65rem" }}>
-              Leave empty for default (api.coze.cn). Use api.coze.com for global.
+            <small style={{ color: "#888", fontSize: "0.6rem", display: "block", marginTop: 6 }}>
+              Applies to browser TTS fallback. COZE audio uses bot's voice.
             </small>
-          </div>
+          </fieldset>
 
-          <div className="debater-modal-field">
-            <label>Debate Bot ID</label>
-            <input
-              type="text"
-              className="nes-input"
-              placeholder="bot_xxxxxxxxxxxxxxxxxxxx"
-              value={debateBotId}
-              onChange={(e) => setDebateBotId(e.target.value)}
-            />
-          </div>
-
-          <div className="debater-modal-field">
-            <label>Discuss Bot ID</label>
-            <input
-              type="text"
-              className="nes-input"
-              placeholder="bot_xxxxxxxxxxxxxxxxxxxx"
-              value={discussBotId}
-              onChange={(e) => setDiscussBotId(e.target.value)}
-            />
-          </div>
-
-          <div className="debater-modal-field">
-            <label>Minecraft Bot ID</label>
-            <input
-              type="text"
-              className="nes-input"
-              placeholder="bot_xxxxxxxxxxxxxxxxxxxx"
-              value={minecraftBotId}
-              onChange={(e) => setMinecraftBotId(e.target.value)}
-            />
-          </div>
-        </fieldset>
-
-        {saveError && (
-          <div className="debater-error nes-container is-rounded" style={{ marginBottom: "0.75rem" }}>
-            <p>⚠ {saveError}</p>
-          </div>
-        )}
-
-        <div className="debater-modal-actions">
-          {!isFirstLaunch && (
-            <button className="nes-btn" onClick={onClose}>
-              Cancel
-            </button>
+          {saveError && (
+            <div className="debater-error" style={{ marginBottom: "0.75rem" }}>
+              <p>{saveError}</p>
+            </div>
           )}
-          <button
-            className="nes-btn is-primary"
-            onClick={handleSave}
-            disabled={
-              !cozeApiKey.trim() &&
-              !deepseekApiKey.trim()
-            }
-          >
-            Save
-          </button>
+
+          <div className="debater-modal-actions">
+            {!isFirstLaunch && (
+              <button className="nes-btn" onClick={handleClose}>
+                Cancel
+              </button>
+            )}
+            <button
+              className="nes-btn is-primary"
+              onClick={handleSave}
+              disabled={
+                !cozeApiKey.trim() &&
+                !deepseekApiKey.trim()
+              }
+            >
+              Save
+            </button>
+          </div>
         </div>
       </div>
     </div>

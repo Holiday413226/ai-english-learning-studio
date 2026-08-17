@@ -22,6 +22,9 @@ const useConfigStore = create(
       discussBotId: "",
       minecraftBotId: "",
 
+      // ── TTS voice preference ──────────────────────────────────
+      ttsVoiceGender: "female",   // "female" | "male"
+
       // ── DeepSeek (Novel translation) ───────────────────────────
       deepseekApiKey: "",
 

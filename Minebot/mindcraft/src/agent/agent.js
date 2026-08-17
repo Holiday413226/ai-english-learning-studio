@@ -108,6 +108,16 @@ function validateExpression(text) {
     return { valid: true };
 }
 
+// ── Layer Selector — 4 toggleable pipeline layers over the always-on base ──
+// Base (always on, never exposed): literal !command fast-path + mineflayer skills.
+// Each layer OFF falls back to an existing code path — no new branch invented.
+const DEFAULT_LAYERS = {
+    intent: true,       // Cognitive LLM → structured action proposal
+    persona_gate: true, // Persona accept/reject/modify decision gate
+    expression: true,   // Expression LLM → natural-language narration
+    autonomy: true,     // SelfPrompter + proactive autonomous modes
+};
+
 export class Agent {
     async start(load_mem=false, init_message=null, count_id=0) {
         this.last_sender = null;
@@ -118,6 +128,9 @@ export class Agent {
         // Initialize components
         this.actions = new ActionManager(this);
         this.prompter = new Prompter(this, settings.profile);
+        // Layer selector: merge profile.layers over defaults (防缺字段)
+        this.layers = { ...DEFAULT_LAYERS, ...(this.prompter.profile.layers || {}) };
+        console.log(`[LAYERS] ${this.prompter.getName() || 'agent'} layers:`, JSON.stringify(this.layers));
         this.name = (this.prompter.getName() || '').trim();
         console.log(`Initializing agent ${this.name}...`);
         
@@ -495,30 +508,35 @@ export class Agent {
                 }
 
                 // ── Cognitive: Intent Recognition (lightweight, no $PERSONA) ──
-                console.log('[V5:COGNITIVE] Calling Cognitive LLM...');
-                let cognitiveRes = await this.prompter.promptCognitive(history);
-                console.log('[V5:COGNITIVE] Output length:', cognitiveRes?.length || 0,
-                    '| Snippet:', String(cognitiveRes).slice(0, 300).replace(/\n/g, '\\n'));
+                let proposal = null;
+                if (this.layers.intent) {
+                    console.log('[V5:COGNITIVE] Calling Cognitive LLM...');
+                    let cognitiveRes = await this.prompter.promptCognitive(history);
+                    console.log('[V5:COGNITIVE] Output length:', cognitiveRes?.length || 0,
+                        '| Snippet:', String(cognitiveRes).slice(0, 300).replace(/\n/g, '\\n'));
 
-                let proposal = (cognitiveRes && cognitiveRes.trim().length > 0)
-                    ? parseActionProposal(cognitiveRes) : null;
+                    proposal = (cognitiveRes && cognitiveRes.trim().length > 0)
+                        ? parseActionProposal(cognitiveRes) : null;
 
-                if (!proposal) {
-                    console.log('[V5:COGNITIVE] parseActionProposal returned null — falling to chat path');
-                } else if (proposal.type === 'chat') {
-                    console.log('[V5:COGNITIVE] Cognitive returned chat intent — no action to execute');
+                    if (!proposal) {
+                        console.log('[V5:COGNITIVE] parseActionProposal returned null — falling to chat path');
+                    } else if (proposal.type === 'chat') {
+                        console.log('[V5:COGNITIVE] Cognitive returned chat intent — no action to execute');
+                    }
+                } else {
+                    console.log('[V5:LAYERS] intent disabled — skipping Cognitive, falling to chat path');
                 }
 
                 if (proposal && proposal.type === 'action' && proposal.action?.type) {
                     console.log('[V5:COGNITIVE] Proposed action:', JSON.stringify(proposal.action));
 
                     // ── Persona Decision Gate (with runtime context) ──
-                    const decision = this.persona
+                    const decision = (this.persona && this.layers.persona_gate)
                         ? this.persona.evaluateWithContext(proposal.action, {
                             source,
                             worldState: this.observer?.worldState?.summarize?.(),
                           })
-                        : { decision: 'accept', reason: 'No persona.', speech_hint: '', runtime_context: null };
+                        : { decision: 'accept', reason: this.layers.persona_gate ? 'No persona.' : 'Persona gate disabled.', speech_hint: '', runtime_context: null };
 
                     let actionResult = '';
                     let executed = false;
@@ -565,20 +583,27 @@ export class Agent {
 
                     // ── Expression LLM (minimal Profile + Runtime State) ──
                     // V5-FIX: Expression runs BEFORE command execution so player gets immediate feedback.
-                    let expressionRes = await this.prompter.promptConvo(history, {
-                        actionResult,
-                        decisionContext: decision.decision,
-                        decisionReason: decision.reason,
-                        relationshipContext: decision.runtime_context?.relationship || null,
-                        speechHint: decision.speech_hint || '',
-                    });
+                    let expressionRes = '';
+                    if (this.layers.expression) {
+                        expressionRes = await this.prompter.promptConvo(history, {
+                            actionResult,
+                            decisionContext: decision.decision,
+                            decisionReason: decision.reason,
+                            relationshipContext: decision.runtime_context?.relationship || null,
+                            speechHint: decision.speech_hint || '',
+                        });
 
-                    console.log(`${this.name} expression to ${source}: ""${expressionRes}""`);
+                        console.log(`${this.name} expression to ${source}: ""${expressionRes}""`);
 
-                    // Reality Guard — debug logging only
-                    const guard = validateExpression(expressionRes);
-                    if (!guard.valid) {
-                        console.warn(`[REALITY_GUARD:DEBUG] Detected ${guard.label} in expression: "${String(expressionRes).slice(0, 100)}"`);
+                        // Reality Guard — debug logging only
+                        const guard = validateExpression(expressionRes);
+                        if (!guard.valid) {
+                            console.warn(`[REALITY_GUARD:DEBUG] Detected ${guard.label} in expression: "${String(expressionRes).slice(0, 100)}"`);
+                        }
+                    } else {
+                        // Expression disabled — respond with the raw action result, no LLM narration.
+                        expressionRes = actionResult;
+                        console.log(`[V5:LAYERS] expression disabled — routing raw actionResult: "${expressionRes}"`);
                     }
 
                     if (expressionRes && expressionRes.trim().length > 0) {
@@ -613,9 +638,14 @@ export class Agent {
 
                 // ── Chat Path: Cognitive returned {type:"chat"} or parse failed ──
                 // Single LLM call with full Profile — no !command capability.
-                let res = await this.prompter.promptConvo(history);
-
-                console.log(`${this.name} full response to ${source}: ""${res}""`);
+                let res = '';
+                if (this.layers.expression) {
+                    res = await this.prompter.promptConvo(history);
+                    console.log(`${this.name} full response to ${source}: ""${res}""`);
+                } else {
+                    console.log('[V5:LAYERS] expression disabled — tool-person: literal command syntax only');
+                    res = '（工具模式：请直接下达命令。）';
+                }
 
                 if (res.trim().length === 0) {
                     console.warn('no response');
@@ -633,7 +663,7 @@ export class Agent {
                     let rejected = false;
                     if (typeof parsed === 'object') {
                         const action = commandToAction(parsed.commandName, parsed.args);
-                        if (action && this.persona) {
+                        if (action && this.persona && this.layers.persona_gate) {
                             const decision = this.persona.evaluateActionProposal(action, { source });
                             if (decision.decision === 'reject' || decision.decision === 'hesitate') {
                                 rejected = true;

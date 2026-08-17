@@ -9,7 +9,20 @@ import { useState, useEffect, useCallback } from "react";
 import useConfigStore from "../../store/configStore";
 import VocabStar from "../../components/vocab/VocabStar";
 import { getCompanionStatus, getCompanionSessions, getCompanionSession,
-         getBridgeStatus, startMinebotBridge, stopMinebotBridge } from "./api";
+         getBridgeStatus, startMinebotBridge, stopMinebotBridge,
+         getLayers, setLayers } from "./api";
+
+const LAYER_META = [
+  { key: "intent",       label: "意图识别", desc: "解析自然语言为动作" },
+  { key: "persona_gate", label: "人格决策", desc: "接受/拒绝/改写动作" },
+  { key: "expression",   label: "动作叙述", desc: "用自然语言叙述动作" },
+  { key: "autonomy",     label: "自主行为", desc: "主动探索/自我提示" },
+];
+
+const LAYER_PRESETS = [
+  { name: "工具人", layers: { intent: true, persona_gate: false, expression: true,  autonomy: false } },
+  { name: "完整人格", layers: { intent: true, persona_gate: true,  expression: true,  autonomy: true } },
+];
 
 export default function MinecraftPage() {
   const deepseekApiKey = useConfigStore((s) => s.deepseekApiKey);
@@ -26,6 +39,10 @@ export default function MinecraftPage() {
   const [bridgeStatus, setBridgeStatus] = useState(null);
   const [starting, setStarting] = useState(false);
   const [stopping, setStopping] = useState(false);
+
+  // Layer selector state
+  const [layers, setLayersState] = useState(null);
+  const [layersSaving, setLayersSaving] = useState(false);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -94,10 +111,50 @@ export default function MinecraftPage() {
     }
   };
 
+  const loadLayers = useCallback(async () => {
+    try {
+      const data = await getLayers();
+      setLayersState(data.layers || null);
+    } catch {
+      // layer selector is optional — ignore fetch errors
+    }
+  }, []);
+
+  useEffect(() => { loadLayers(); }, [loadLayers]);
+
+  const toggleLayer = async (key) => {
+    if (!layers) return;
+    const prev = layers;
+    const next = { ...layers, [key]: !layers[key] };
+    setLayersState(next);
+    setLayersSaving(true);
+    try {
+      const data = await setLayers(next);
+      setLayersState(data.layers || next);
+    } catch (err) {
+      setError(err.message);
+      setLayersState(prev);
+    } finally {
+      setLayersSaving(false);
+    }
+  };
+
+  const applyPreset = async (preset) => {
+    setLayersSaving(true);
+    try {
+      const data = await setLayers(preset);
+      setLayersState(data.layers || preset);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLayersSaving(false);
+    }
+  };
+
   return (
     <div className="page-content">
       <header>
-        <h1>⛏ Minecraft Companion</h1>
+        <h1>Minecraft Companion</h1>
         <p>PCL chat in-game + Web panel for review &amp; vocab collection</p>
       </header>
 
@@ -105,30 +162,30 @@ export default function MinecraftPage() {
         {/* ── Left sidebar — Session list ─────────────────── */}
         <div className="debater-sessions" style={{ width: 220 }}>
           {/* Bot Status */}
-          <div style={{ padding: "10px 12px", borderBottom: "2px solid #3d1a60" }}>
-            <div style={{ fontSize: "0.5rem", color: "#9b8ab8", fontFamily: "'Press Start 2P', monospace" }}>
+          <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border-default)" }}>
+            <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
               Bot:{" "}
-              <span style={{ color: status?.bot_online ? "#50fa7b" : "#ff6b8a" }}>
+              <span style={{ color: status?.bot_online ? "var(--accent)" : "var(--danger)" }}>
                 {status?.bot_online ? "ONLINE" : "OFFLINE"}
               </span>
             </div>
             {status?.bot_name && (
-              <div style={{ fontSize: "0.4rem", color: "#6a5a8a", marginTop: 2 }}>
+              <div style={{ fontSize: "0.6rem", color: "var(--text-muted)", marginTop: 2 }}>
                 {status.bot_name}
               </div>
             )}
 
             {/* Minebot process control */}
-            <div style={{ fontSize: "0.4rem", color: "#9b8ab8", marginTop: 8 }}>
+            <div style={{ fontSize: "0.6rem", color: "var(--text-secondary)", marginTop: 8 }}>
               MindServer:{" "}
-              <span style={{ color: bridgeStatus?.minebot_running ? "#50fa7b" : "#ff6b8a" }}>
+              <span style={{ color: bridgeStatus?.minebot_running ? "var(--accent)" : "var(--danger)" }}>
                 {bridgeStatus?.minebot_running ? "RUNNING" : "STOPPED"}
               </span>
             </div>
             {!bridgeStatus?.minebot_running ? (
               <button
                 className="nes-btn is-success"
-                style={{ fontSize: "0.4rem", width: "100%", padding: "6px", marginTop: 6 }}
+                style={{ fontSize: "0.65rem", width: "100%", padding: "6px", marginTop: 6 }}
                 onClick={startMinebot}
                 disabled={starting}
               >
@@ -137,7 +194,7 @@ export default function MinecraftPage() {
             ) : (
               <button
                 className="nes-btn is-error"
-                style={{ fontSize: "0.4rem", width: "100%", padding: "6px", marginTop: 6 }}
+                style={{ fontSize: "0.65rem", width: "100%", padding: "6px", marginTop: 6 }}
                 onClick={stopMinebot}
                 disabled={stopping}
               >
@@ -146,10 +203,52 @@ export default function MinecraftPage() {
             )}
           </div>
 
+          {/* Layer selector */}
+          <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border-default)" }}>
+            <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", fontFamily: "var(--font-mono)", marginBottom: 6 }}>
+              图层选择
+              <span style={{ fontSize: "0.55rem", color: "var(--text-muted)" }}>（改动后需重启 Minebot）</span>
+            </div>
+            {layers ? (
+              <>
+                {LAYER_META.map((m) => (
+                  <label
+                    key={m.key}
+                    style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.62rem", color: "var(--text-secondary)", marginBottom: 4, cursor: "pointer" }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={!!layers[m.key]}
+                      onChange={() => toggleLayer(m.key)}
+                      disabled={layersSaving}
+                    />
+                    <span>{m.label}</span>
+                    <span style={{ color: "var(--text-muted)", fontSize: "0.55rem" }}>{m.desc}</span>
+                  </label>
+                ))}
+                <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  {LAYER_PRESETS.map((p) => (
+                    <button
+                      key={p.name}
+                      className="nes-btn is-primary"
+                      style={{ fontSize: "0.6rem", padding: "4px 8px" }}
+                      onClick={() => applyPreset(p.layers)}
+                      disabled={layersSaving}
+                    >
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p style={{ fontSize: "0.6rem", color: "var(--text-muted)" }}>加载中…</p>
+            )}
+          </div>
+
           {/* Sessions list */}
           <div className="debater-sessions-list" style={{ flex: 1, overflowY: "auto" }}>
             {sessions.length === 0 && (
-              <p style={{ fontSize: "0.45rem", color: "#4a3070", textAlign: "center", padding: "16px 8px" }}>
+              <p style={{ fontSize: "0.65rem", color: "var(--text-muted)", textAlign: "center", padding: "16px 8px" }}>
                 No sessions yet.<br />
                 Start a conversation in PCL!
               </p>
@@ -160,7 +259,7 @@ export default function MinecraftPage() {
                 className={`debater-session-item ${currentSession === s.session_id ? "active" : ""}`}
                 onClick={() => loadSession(s.session_id)}
               >
-                <span className="debater-session-mode">💬</span>
+                <span className="debater-session-mode" style={{ fontSize: "12px" }}>Chat</span>
                 <span className="debater-session-preview">
                   {s.preview || "New session"}
                 </span>
@@ -169,10 +268,10 @@ export default function MinecraftPage() {
           </div>
 
           {/* Refresh button */}
-          <div style={{ padding: "8px 10px", borderTop: "2px solid #3d1a60" }}>
-            <button className="nes-btn is-primary" style={{ fontSize: "0.4rem", width: "100%", padding: "6px" }}
+          <div style={{ padding: "8px 10px", borderTop: "1px solid var(--border-default)" }}>
+            <button className="nes-btn is-primary" style={{ fontSize: "0.65rem", width: "100%", padding: "6px" }}
               onClick={refresh} disabled={loading}>
-              🔄 Refresh{lastRefresh ? ` (${lastRefresh})` : ""}
+              Refresh{lastRefresh ? ` (${lastRefresh})` : ""}
             </button>
           </div>
         </div>
@@ -181,26 +280,26 @@ export default function MinecraftPage() {
         <div className="debater-chat" style={{ flex: 1 }}>
           <div className="debater-messages" style={{ flex: 1 }}>
             {error && (
-              <div className="debater-error nes-container is-rounded">
-                <p>⚠ {error}</p>
+              <div className="debater-error">
+                <p>{error}</p>
               </div>
             )}
 
             {messages.length === 0 && !currentSession && (
               <div className="debater-welcome">
                 <p>
-                  🤖 Your Minecraft companion is ready.<br /><br />
+                  Your Minecraft companion is ready.<br /><br />
                   Chat with the AI bot <strong>inside Minecraft (PCL)</strong> —<br />
                   your conversation will appear here.<br /><br />
-                  <span style={{ fontSize: "0.45rem", color: "#6a5a8a" }}>
-                    ⭐ Select words from bot messages to save to Vocab Vault.
+                  <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>
+                    Select words from bot messages to save to Vocab Vault.
                   </span>
                 </p>
               </div>
             )}
 
             {messages.length === 0 && currentSession && (
-              <p style={{ textAlign: "center", color: "#6a5a8a", fontSize: "0.55rem", padding: "30px 0" }}>
+              <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.75rem", padding: "30px 0" }}>
                 No messages in this session yet.
               </p>
             )}
@@ -211,7 +310,7 @@ export default function MinecraftPage() {
                 className={`debater-bubble ${msg.role === "user" ? "debater-bubble--user" : ""}`}
               >
                 <span className="debater-bubble-avatar">
-                  {msg.role === "user" ? "🧑" : "🤖"}
+                  {msg.role === "user" ? "You" : "AI"}
                 </span>
                 <div className={`debater-bubble-content ${msg.role === "user" ? "is-user" : "is-ai"}`}>
                   <p>{msg.content}</p>
@@ -233,10 +332,10 @@ export default function MinecraftPage() {
 
           {/* ── Info bar ──────────────────────────────────── */}
           <div className="debater-input-bar" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
-            <span style={{ fontSize: "0.45rem", color: "#6a5a8a" }}>
-              ⚠ Messages are sent inside <strong>PCL / Minecraft</strong> chat, not here.
+            <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>
+              Messages are sent inside <strong>PCL / Minecraft</strong> chat, not here.
             </span>
-            <span style={{ fontSize: "0.45rem", color: "#4a3070" }}>
+            <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>
               This panel is for <strong>review &amp; vocab</strong> only.
             </span>
           </div>

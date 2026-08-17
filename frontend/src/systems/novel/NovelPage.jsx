@@ -96,18 +96,18 @@ export default function NovelPage() {
       {/* ── Translation History ────────────────────────────── */}
       {historySessions.length > 0 && (
         <div style={{ marginBottom: 16 }}>
-          <button className="nes-btn" style={{ fontSize: "0.5rem" }}
+          <button className="nes-btn" style={{ fontSize: "0.75rem" }}
             onClick={() => setShowHistory(!showHistory)}>
-            📋 {showHistory ? "Hide" : "Show"} Translation History ({historySessions.length})
+            {showHistory ? "Hide" : "Show"} Translation History ({historySessions.length})
           </button>
           {showHistory && (
             <div className="window" style={{ marginTop: 8, padding: "10px 14px" }}>
               {historySessions.map((s) => (
                 <button key={s.session_id}
                   className="nes-btn"
-                  style={{ fontSize: "0.45rem", margin: "3px 4px", display: "inline-block" }}
+                  style={{ fontSize: "0.7rem", margin: "3px 4px", display: "inline-block" }}
                   onClick={() => loadHistorySession(s.session_id)}>
-                  📖 {s.preview?.slice(0, 40) || s.session_id?.slice(0, 8)}
+                  {s.preview?.slice(0, 40) || s.session_id?.slice(0, 8)}
                 </button>
               ))}
             </div>
@@ -140,15 +140,15 @@ export default function NovelPage() {
         <div className="window window-col">
           <OutputDisplay result={result} loading={loading} error={error} />
           {result && result.highlights && result.highlights.length > 0 && (
-            <div style={{ marginTop: 10, borderTop: "2px solid #3d1a60", paddingTop: 10 }}>
-              <p style={{ fontSize: "0.45rem", color: "#50fa7b", fontFamily: "'Press Start 2P', monospace", marginBottom: 8 }}>
-                ⭐ Save highlighted words to Vocab Vault
+            <div style={{ marginTop: 10, borderTop: "1px solid var(--border-default)", paddingTop: 10 }}>
+              <p style={{ fontSize: "0.7rem", color: "var(--accent)", fontFamily: "var(--font-mono)", marginBottom: 8 }}>
+                Save highlighted words to Vocab Vault
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {result.highlights.map((h, i) => (
                   <div key={i} style={{ display: "flex", alignItems: "center", gap: 4,
-                    background: "#0d001a", border: "1px solid #3d1a60", padding: "4px 8px", borderRadius: 4 }}>
-                    <span style={{ fontSize: "0.5rem", color: "#87ceeb" }}>{h.word}</span>
+                    background: "var(--bg-input)", border: "1px solid var(--border-default)", padding: "4px 8px", borderRadius: 4 }}>
+                    <span style={{ fontSize: "0.75rem", color: "var(--highlight)" }}>{h.word}</span>
                     <VocabStar
                       word={h.word}
                       context={result.translated_text?.slice(Math.max(0, h.start - 20), h.end + 50) || ""}

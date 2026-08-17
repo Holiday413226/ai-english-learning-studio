@@ -7,12 +7,12 @@ import { useState, useEffect, useCallback } from "react";
 import useConfigStore from "../../store/configStore";
 import { listWords, deleteWord, reviewWord, getDueWords, getQuiz, exportCSV } from "./api";
 
-const TABS = ["📋 Word List", "🔄 Flashcards", "🎯 Quiz"];
+const TABS = ["Word List", "Flashcards", "Quiz"];
 
 const QUALITY_LABELS = [
-  { q: 0, label: "😰 Forgot", cls: "is-error" },
-  { q: 3, label: "🤔 Unsure", cls: "is-warning" },
-  { q: 5, label: "😊 Got It", cls: "is-success" },
+  { q: 0, label: "Forgot", cls: "is-error" },
+  { q: 3, label: "Unsure", cls: "is-warning" },
+  { q: 5, label: "Got It", cls: "is-success" },
 ];
 
 export default function VocabPage() {
@@ -30,6 +30,7 @@ export default function VocabPage() {
   const [dueWords, setDueWords] = useState([]);
   const [cardIdx, setCardIdx] = useState(0);
   const [flipped, setFlipped] = useState(false);
+  const [flashcardLoading, setFlashcardLoading] = useState(false);
 
   // ── Quiz state ───────────────────────────────────────────
   const [quiz, setQuiz] = useState(null);
@@ -79,8 +80,9 @@ export default function VocabPage() {
     }
   };
 
-  const loadFlashcards = async () => {
+  const loadFlashcards = useCallback(async () => {
     setError(null);
+    setFlashcardLoading(true);
     try {
       const data = await getDueWords(30);
       setDueWords(data.words);
@@ -88,8 +90,10 @@ export default function VocabPage() {
       setFlipped(false);
     } catch (e) {
       setError(e.message);
+    } finally {
+      setFlashcardLoading(false);
     }
-  };
+  }, []);
 
   const handleReview = async (quality) => {
     const word = dueWords[cardIdx];
@@ -136,7 +140,7 @@ export default function VocabPage() {
         <button
           key={t}
           className={`nes-btn ${i === tab ? "is-primary" : ""}`}
-          style={{ fontSize: "0.5rem", padding: "8px 14px" }}
+          style={{ fontSize: "0.75rem", padding: "8px 14px", whiteSpace: "nowrap" }}
           onClick={() => {
             setTab(i);
             if (i === 1) loadFlashcards();
@@ -150,13 +154,13 @@ export default function VocabPage() {
 
   // ── Render: Tab 0 — Word List ────────────────────────────
   const renderWordList = () => {
-    if (loading) return <p style={{ color: "#9b8ab8", fontSize: "0.55rem" }}>Loading...</p>;
-    if (error) return <div className="debater-error nes-container is-rounded"><p>⚠ {error}</p></div>;
+    if (loading) return <p style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>Loading...</p>;
+    if (error) return <div className="debater-error"><p>{error}</p></div>;
     if (words.length === 0) return (
       <div className="placeholder-box">
-        <p style={{ fontSize: "0.65rem", color: "#6a5a8a", textAlign: "center" }}>
+        <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", textAlign: "center" }}>
           No words yet! <br />
-          Click ⭐ on words in any module to save them here.
+          Click the star on words in any module to save them here.
         </p>
       </div>
     );
@@ -164,21 +168,21 @@ export default function VocabPage() {
     return (
       <div>
         <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "0.5rem", color: "#9b8ab8" }}>{total} words</span>
-          <select className="nes-input" style={{ fontSize: "0.45rem", width: "auto", padding: "4px 8px" }}
+          <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{total} words</span>
+          <select className="nes-input" style={{ fontSize: "0.7rem", width: "auto", padding: "4px 8px" }}
             value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
             <option value="created_at">Date Added</option>
             <option value="word">Alphabetical</option>
             <option value="next_review">Next Review</option>
             <option value="review_count">Most Reviewed</option>
           </select>
-          <button className="nes-btn is-success" style={{ fontSize: "0.4rem", padding: "6px 10px" }}
+          <button className="nes-btn is-success" style={{ fontSize: "0.65rem", padding: "6px 10px" }}
             onClick={() => setOrder(o => o === "desc" ? "asc" : "desc")}>
-            {order === "desc" ? "↓ Newest" : "↑ Oldest"}
+            {order === "desc" ? "Newest" : "Oldest"}
           </button>
-          <button className="nes-btn is-primary" style={{ fontSize: "0.4rem", padding: "6px 10px", marginLeft: "auto" }}
+          <button className="nes-btn is-primary" style={{ fontSize: "0.65rem", padding: "6px 10px", marginLeft: "auto" }}
             onClick={handleExport}>
-            📥 CSV
+            CSV Export
           </button>
         </div>
 
@@ -186,17 +190,17 @@ export default function VocabPage() {
           {words.map((w) => (
             <div key={w.word} className="window" style={{ padding: "12px 16px", display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ flex: 1 }}>
-                <span style={{ fontSize: "0.65rem", color: "#50fa7b", fontFamily: "'Press Start 2P', monospace" }}>
+                <span style={{ fontSize: "0.85rem", color: "var(--accent)", fontFamily: "var(--font-mono)" }}>
                   {w.word}
                 </span>
-                {w.phonetic && <span style={{ fontSize: "0.45rem", color: "#7a6a9a", marginLeft: 8 }}>{w.phonetic}</span>}
-                <div style={{ fontSize: "0.5rem", color: "#9b8ab8", marginTop: 3 }}>{w.definition_zh || w.definition_en}</div>
+                {w.phonetic && <span style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginLeft: 8 }}>{w.phonetic}</span>}
+                <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: 3 }}>{w.definition_zh || w.definition_en}</div>
               </div>
-              <span style={{ fontSize: "0.4rem", color: "#4a3070", fontFamily: "'Press Start 2P', monospace" }}>
+              <span style={{ fontSize: "0.65rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
                 {w.source_module}
               </span>
-              <button className="nes-btn is-error" style={{ fontSize: "0.4rem", padding: "4px 8px" }}
-                onClick={() => handleDelete(w.word)}>🗑</button>
+              <button className="nes-btn is-error" style={{ fontSize: "0.65rem", padding: "4px 8px" }}
+                onClick={() => handleDelete(w.word)}>Delete</button>
             </div>
           ))}
         </div>
@@ -206,28 +210,48 @@ export default function VocabPage() {
 
   // ── Render: Tab 1 — Flashcards ───────────────────────────
   const renderFlashcards = () => {
-    if (dueWords.length === 0 && cardIdx === 0 && !error) {
+    if (flashcardLoading) {
+      return (
+        <div style={{ textAlign: "center", padding: "40px 0" }}>
+          <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>Loading flashcards...</p>
+        </div>
+      );
+    }
+
+    if (error && dueWords.length === 0) {
+      return (
+        <div style={{ textAlign: "center", padding: "40px 0" }}>
+          <div className="debater-error">
+            <p>{error}</p>
+          </div>
+          <button className="nes-btn is-primary" style={{ fontSize: "0.75rem", marginTop: 16 }}
+            onClick={loadFlashcards}>Retry</button>
+        </div>
+      );
+    }
+
+    if (dueWords.length === 0 && cardIdx === 0) {
       return (
         <div style={{ textAlign: "center", padding: "40px 0" }}>
           <div className="placeholder-box">
-            <p style={{ fontSize: "0.65rem", color: "#6a5a8a" }}>
-              🎉 All caught up! No words due for review.
+            <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+              All caught up! No words due for review.
             </p>
           </div>
-          <button className="nes-btn is-primary" style={{ fontSize: "0.5rem", marginTop: 16 }}
-            onClick={loadFlashcards}>🔄 Refresh</button>
+          <button className="nes-btn is-primary" style={{ fontSize: "0.75rem", marginTop: 16 }}
+            onClick={loadFlashcards}>Refresh</button>
         </div>
       );
     }
 
     const card = dueWords[cardIdx];
     if (!card) {
-      return <p style={{ color: "#9b8ab8", fontSize: "0.55rem" }}>Loading flashcards...</p>;
+      return <p style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>Loading flashcards...</p>;
     }
 
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
-        <p style={{ fontSize: "0.5rem", color: "#9b8ab8" }}>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
           Card {cardIdx + 1} of {dueWords.length}
         </p>
 
@@ -241,31 +265,31 @@ export default function VocabPage() {
             display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
             padding: "32px 24px",
             transition: "transform 0.3s, background 0.3s",
-            background: flipped ? "#0a1a10" : "#1a0a30",
+            background: flipped ? "rgba(80, 250, 123, 0.06)" : "var(--bg-card)",
           }}
         >
           {!flipped ? (
             <>
-              <div style={{ fontSize: "1.8rem", fontFamily: "'Press Start 2P', monospace", color: "#50fa7b", textShadow: "2px 2px 0 #0d400d", textAlign: "center" }}>
+              <div style={{ fontSize: "1.8rem", fontFamily: "var(--font-mono)", color: "var(--accent)", textShadow: "0 0 20px rgba(80, 250, 123, 0.15)", textAlign: "center" }}>
                 {card.word}
               </div>
-              {card.phonetic && <div style={{ fontSize: "0.6rem", color: "#7a6a9a", marginTop: 8 }}>{card.phonetic}</div>}
-              <div style={{ fontSize: "0.4rem", color: "#4a3070", marginTop: 12 }}>click to flip</div>
+              {card.phonetic && <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 8 }}>{card.phonetic}</div>}
+              <div style={{ fontSize: "0.65rem", color: "var(--text-muted)", marginTop: 12 }}>click to flip</div>
             </>
           ) : (
             <>
-              <div style={{ fontSize: "0.55rem", color: "#d0c8e8", textAlign: "center", lineHeight: 1.8 }}>
+              <div style={{ fontSize: "0.8rem", color: "var(--text-primary)", textAlign: "center", lineHeight: 1.8 }}>
                 {card.definition_en || "(no definition)"}
               </div>
-              <div style={{ fontSize: "0.65rem", color: "#50fa7b", marginTop: 8, textAlign: "center" }}>
+              <div style={{ fontSize: "0.85rem", color: "var(--accent)", marginTop: 8, textAlign: "center" }}>
                 {card.definition_zh || ""}
               </div>
               {card.example_sentence && (
-                <div style={{ fontSize: "0.5rem", color: "#9b8ab8", marginTop: 10, textAlign: "center", fontStyle: "italic" }}>
-                  "{card.example_sentence}"
+                <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: 10, textAlign: "center", fontStyle: "italic" }}>
+                  &ldquo;{card.example_sentence}&rdquo;
                 </div>
               )}
-              <div style={{ fontSize: "0.4rem", color: "#4a3070", marginTop: 8 }}>
+              <div style={{ fontSize: "0.65rem", color: "var(--text-muted)", marginTop: 8 }}>
                 from: {card.source_module || "unknown"}
               </div>
             </>
@@ -276,7 +300,7 @@ export default function VocabPage() {
         {flipped && (
           <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
             {QUALITY_LABELS.map(({ q, label, cls }) => (
-              <button key={q} className={`nes-btn ${cls}`} style={{ fontSize: "0.5rem" }}
+              <button key={q} className={`nes-btn ${cls}`} style={{ fontSize: "0.75rem" }}
                 onClick={() => handleReview(q)}>{label}</button>
             ))}
           </div>
@@ -290,12 +314,12 @@ export default function VocabPage() {
     if (!quiz) {
       return (
         <div style={{ textAlign: "center", padding: "40px 0" }}>
-          <p style={{ fontSize: "0.55rem", color: "#9b8ab8", marginBottom: 16 }}>
+          <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 16 }}>
             Test yourself with 10 multiple-choice questions from your Vocab Vault.
           </p>
-          <button className="nes-btn is-primary" style={{ fontSize: "0.55rem" }}
+          <button className="nes-btn is-primary" style={{ fontSize: "0.8rem" }}
             onClick={startQuiz} disabled={total < 4}>
-            {total < 4 ? "Need at least 4 words in vault" : "🎯 Start Quiz"}
+            {total < 4 ? "Need at least 4 words in vault" : "Start Quiz"}
           </button>
         </div>
       );
@@ -305,7 +329,7 @@ export default function VocabPage() {
       const correct = answers.filter((a) => a.correct).length;
       return (
         <div style={{ textAlign: "center", padding: "20px 0" }}>
-          <p style={{ fontSize: "0.65rem", color: "#50fa7b", fontFamily: "'Press Start 2P', monospace", marginBottom: 12 }}>
+          <p style={{ fontSize: "0.85rem", color: "var(--accent)", fontFamily: "var(--font-mono)", marginBottom: 12 }}>
             {correct} / {answers.length} ({Math.round((correct / answers.length) * 100)}%)
           </p>
           {/* Show wrong answers */}
@@ -313,14 +337,14 @@ export default function VocabPage() {
             const opt = quiz[i + answers.findIndex((x) => x.word === a.word)];
             return (
               <div key={i} className="window" style={{ padding: "10px 14px", marginBottom: 8, textAlign: "left" }}>
-                <span style={{ fontSize: "0.55rem", color: "#50fa7b" }}>{a.word}</span>
-                <span style={{ fontSize: "0.45rem", color: "#ff6b8a", marginLeft: 8 }}>✗ {opt?.options[a.correctIdx]}</span>
+                <span style={{ fontSize: "0.8rem", color: "var(--accent)" }}>{a.word}</span>
+                <span style={{ fontSize: "0.7rem", color: "var(--danger)", marginLeft: 8 }}>Correct: {opt?.options[a.correctIdx]}</span>
               </div>
             );
           })}
           <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 16 }}>
-            <button className="nes-btn is-primary" style={{ fontSize: "0.5rem" }} onClick={startQuiz}>🔄 Retry</button>
-            <button className="nes-btn" style={{ fontSize: "0.5rem" }} onClick={() => setQuiz(null)}>Back</button>
+            <button className="nes-btn is-primary" style={{ fontSize: "0.75rem" }} onClick={startQuiz}>Retry</button>
+            <button className="nes-btn" style={{ fontSize: "0.75rem" }} onClick={() => setQuiz(null)}>Back</button>
           </div>
         </div>
       );
@@ -329,18 +353,18 @@ export default function VocabPage() {
     const q = quiz[qIdx];
     return (
       <div style={{ maxWidth: 500, margin: "0 auto" }}>
-        <p style={{ fontSize: "0.5rem", color: "#9b8ab8", marginBottom: 10 }}>
+        <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 10 }}>
           Question {qIdx + 1} of {quiz.length}
         </p>
         <div className="window" style={{ padding: "24px 20px", textAlign: "center", marginBottom: 16 }}>
-          <div style={{ fontSize: "1.2rem", fontFamily: "'Press Start 2P', monospace", color: "#50fa7b", marginBottom: 6 }}>
+          <div style={{ fontSize: "1.3rem", fontFamily: "var(--font-mono)", color: "var(--accent)", marginBottom: 6 }}>
             {q.word}
           </div>
-          {q.phonetic && <div style={{ fontSize: "0.55rem", color: "#7a6a9a" }}>{q.phonetic}</div>}
+          {q.phonetic && <div style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{q.phonetic}</div>}
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {q.options.map((opt, i) => (
-            <button key={i} className="nes-btn" style={{ fontSize: "0.5rem", textAlign: "left", padding: "12px 16px" }}
+            <button key={i} className="nes-btn" style={{ fontSize: "0.75rem", textAlign: "left", padding: "12px 16px" }}
               onClick={() => answerQuiz(i)}>
               {String.fromCharCode(65 + i)}. {opt}
             </button>
@@ -353,7 +377,7 @@ export default function VocabPage() {
   return (
     <div className="page-content">
       <header>
-        <h1>📚 Vocab Vault</h1>
+        <h1>Vocab Vault</h1>
         <p>Your personal vocabulary treasure — collected from all learning modules</p>
       </header>
 
