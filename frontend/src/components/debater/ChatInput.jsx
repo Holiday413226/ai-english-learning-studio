@@ -40,15 +40,15 @@ export default function ChatInput({
 
   const placeholder =
     mode === "debate"
-      ? "Make your argument..."
-      : "Share your thoughts...";
+      ? "陈述你的论点…"
+      : "分享你的想法…";
 
   return (
     <div className="debater-input-bar">
       {/* Row 1: toggles + phone relay button */}
       <div className="debater-toggles">
         <label className="debater-toggle">
-          <span>Debate</span>
+          <span>辩论</span>
           <input
             type="checkbox"
             className="nes-toggle"
@@ -57,27 +57,27 @@ export default function ChatInput({
               onToggleMode(e.target.checked ? "discuss" : "debate")
             }
           />
-          <span>Discuss</span>
+          <span>讨论</span>
         </label>
 
         <label className="debater-toggle">
-          <span>Text</span>
+          <span>文字</span>
           <input
             type="checkbox"
             className="nes-toggle"
             checked={voiceMode}
             onChange={(e) => onToggleVoice(e.target.checked)}
           />
-          <span>Voice</span>
+          <span>语音</span>
         </label>
 
         <button
           className="nes-btn is-primary"
           onClick={() => setRelayOpen(true)}
-          title="Phone voice input"
+          title="手机语音输入"
           style={{ fontSize: "0.55rem", padding: "3px 10px", flexShrink: 0 }}
         >
-          Phone Input
+          手机输入
         </button>
       </div>
 
@@ -107,7 +107,7 @@ export default function ChatInput({
               onClick={handleSend}
               disabled={disabled || !text.trim()}
             >
-              Send
+              发送
             </button>
           </>
         )}

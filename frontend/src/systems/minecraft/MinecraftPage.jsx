@@ -154,8 +154,8 @@ export default function MinecraftPage() {
   return (
     <div className="page-content">
       <header>
-        <h1>Minecraft Companion</h1>
-        <p>PCL chat in-game + Web panel for review &amp; vocab collection</p>
+        <h1>我的世界 AI 伙伴</h1>
+        <p>PCL 游戏内对话 + 网页面板用于复盘与词汇收藏</p>
       </header>
 
       <main className="debater-main">
@@ -164,9 +164,9 @@ export default function MinecraftPage() {
           {/* Bot Status */}
           <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border-default)" }}>
             <div style={{ fontSize: "0.7rem", color: "var(--text-secondary)", fontFamily: "var(--font-mono)" }}>
-              Bot:{" "}
+              机器人：{" "}
               <span style={{ color: status?.bot_online ? "var(--accent)" : "var(--danger)" }}>
-                {status?.bot_online ? "ONLINE" : "OFFLINE"}
+                {status?.bot_online ? "在线" : "离线"}
               </span>
             </div>
             {status?.bot_name && (
@@ -177,9 +177,9 @@ export default function MinecraftPage() {
 
             {/* Minebot process control */}
             <div style={{ fontSize: "0.6rem", color: "var(--text-secondary)", marginTop: 8 }}>
-              MindServer:{" "}
+              思维服务：{" "}
               <span style={{ color: bridgeStatus?.minebot_running ? "var(--accent)" : "var(--danger)" }}>
-                {bridgeStatus?.minebot_running ? "RUNNING" : "STOPPED"}
+                {bridgeStatus?.minebot_running ? "运行中" : "已停止"}
               </span>
             </div>
             {!bridgeStatus?.minebot_running ? (
@@ -189,7 +189,7 @@ export default function MinecraftPage() {
                 onClick={startMinebot}
                 disabled={starting}
               >
-                {starting ? "Starting..." : "Start Minebot"}
+                {starting ? "启动中…" : "启动 Minebot"}
               </button>
             ) : (
               <button
@@ -198,7 +198,7 @@ export default function MinecraftPage() {
                 onClick={stopMinebot}
                 disabled={stopping}
               >
-                {stopping ? "Stopping..." : "Stop Minebot"}
+                {stopping ? "停止中…" : "停止 Minebot"}
               </button>
             )}
           </div>
@@ -249,8 +249,8 @@ export default function MinecraftPage() {
           <div className="debater-sessions-list" style={{ flex: 1, overflowY: "auto" }}>
             {sessions.length === 0 && (
               <p style={{ fontSize: "0.65rem", color: "var(--text-muted)", textAlign: "center", padding: "16px 8px" }}>
-                No sessions yet.<br />
-                Start a conversation in PCL!
+                暂无对话。<br />
+                在 PCL 中开始对话吧！
               </p>
             )}
             {sessions.map((s) => (
@@ -259,9 +259,9 @@ export default function MinecraftPage() {
                 className={`debater-session-item ${currentSession === s.session_id ? "active" : ""}`}
                 onClick={() => loadSession(s.session_id)}
               >
-                <span className="debater-session-mode" style={{ fontSize: "12px" }}>Chat</span>
+                <span className="debater-session-mode" style={{ fontSize: "12px" }}>对话</span>
                 <span className="debater-session-preview">
-                  {s.preview || "New session"}
+                  {s.preview || "新对话"}
                 </span>
               </div>
             ))}
@@ -271,7 +271,7 @@ export default function MinecraftPage() {
           <div style={{ padding: "8px 10px", borderTop: "1px solid var(--border-default)" }}>
             <button className="nes-btn is-primary" style={{ fontSize: "0.65rem", width: "100%", padding: "6px" }}
               onClick={refresh} disabled={loading}>
-              Refresh{lastRefresh ? ` (${lastRefresh})` : ""}
+              刷新{lastRefresh ? ` (${lastRefresh})` : ""}
             </button>
           </div>
         </div>
@@ -288,11 +288,11 @@ export default function MinecraftPage() {
             {messages.length === 0 && !currentSession && (
               <div className="debater-welcome">
                 <p>
-                  Your Minecraft companion is ready.<br /><br />
-                  Chat with the AI bot <strong>inside Minecraft (PCL)</strong> —<br />
-                  your conversation will appear here.<br /><br />
+                  你的我的世界 AI 伙伴已就绪。<br /><br />
+                  在 <strong>Minecraft（PCL）</strong> 中与 AI 机器人对话——<br />
+                  你们的对话会显示在这里。<br /><br />
                   <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>
-                    Select words from bot messages to save to Vocab Vault.
+                    从机器人消息中选择单词收藏到词汇库。
                   </span>
                 </p>
               </div>
@@ -300,7 +300,7 @@ export default function MinecraftPage() {
 
             {messages.length === 0 && currentSession && (
               <p style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "0.75rem", padding: "30px 0" }}>
-                No messages in this session yet.
+                该对话暂无消息。
               </p>
             )}
 
@@ -310,7 +310,7 @@ export default function MinecraftPage() {
                 className={`debater-bubble ${msg.role === "user" ? "debater-bubble--user" : ""}`}
               >
                 <span className="debater-bubble-avatar">
-                  {msg.role === "user" ? "You" : "AI"}
+                  {msg.role === "user" ? "你" : "AI"}
                 </span>
                 <div className={`debater-bubble-content ${msg.role === "user" ? "is-user" : "is-ai"}`}>
                   <p>{msg.content}</p>
@@ -333,10 +333,10 @@ export default function MinecraftPage() {
           {/* ── Info bar ──────────────────────────────────── */}
           <div className="debater-input-bar" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
             <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>
-              Messages are sent inside <strong>PCL / Minecraft</strong> chat, not here.
+              消息在 <strong>PCL / Minecraft</strong> 游戏内发送，不在这里。
             </span>
             <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>
-              This panel is for <strong>review &amp; vocab</strong> only.
+              此面板仅用于 <strong>复盘与词汇</strong>。
             </span>
           </div>
         </div>

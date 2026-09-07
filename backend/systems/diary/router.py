@@ -9,6 +9,7 @@ import traceback
 from flask import request, jsonify
 from systems.diary.grader import grade_entry
 from systems.diary.session_storage import diary_storage
+from core.gateway_client import run_ai, is_hosted
 
 
 def register_diary_routes(app):
@@ -34,7 +35,7 @@ def register_diary_routes(app):
         text = (data.get("text", "") or "").strip()
         entry_date = (data.get("date", "") or "").strip()
 
-        if not api_key:
+        if not api_key and not is_hosted():
             return jsonify({"error": "API Key is required"}), 400
         if not text:
             return jsonify({"error": "Diary text is required"}), 400
@@ -45,7 +46,11 @@ def register_diary_routes(app):
             entry_date = date.today().isoformat()
 
         try:
-            result = grade_entry(api_key, text, entry_date)
+            result = run_ai(
+                "diary_grade",
+                {"text": text, "date": entry_date},
+                lambda: grade_entry(api_key, text, entry_date),
+            )
         except RuntimeError as e:
             return jsonify({"error": str(e)}), 502
         except Exception as e:

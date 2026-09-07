@@ -52,6 +52,12 @@ export async function getDueWords(limit = 20) {
   return resp.json();
 }
 
+export async function getFlashcards(limit = 30) {
+  const resp = await fetch(`${BASE}/flashcards?limit=${limit}`);
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  return resp.json();
+}
+
 export async function exportCSV() {
   const resp = await fetch(`${BASE}/export`);
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);

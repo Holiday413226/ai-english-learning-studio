@@ -16,6 +16,7 @@ from flask import request, jsonify
 from core.coze_client import chat_with_bot
 from systems.minecraft.session_storage import minecraft_storage
 from systems.minecraft.bridge import MinebotBridge, get_layers, set_layers
+from core.gateway_client import run_ai, is_hosted
 
 
 def register_minecraft_routes(app):
@@ -43,9 +44,9 @@ def register_minecraft_routes(app):
         api_url = data.get("api_url", "").strip() or None
 
         # Validation
-        if not api_key:
+        if not api_key and not is_hosted():
             return jsonify({"error": "COZE API Key is required"}), 400
-        if not bot_id:
+        if not bot_id and not is_hosted():
             return jsonify({"error": "Bot ID is required"}), 400
         if not message:
             return jsonify({"error": "Message is required"}), 400
@@ -60,12 +61,16 @@ def register_minecraft_routes(app):
         # Call COZE
         conversation_id = minecraft_storage.get_conversation_id(sid)
         try:
-            result = chat_with_bot(
-                api_key=api_key,
-                bot_id=bot_id,
-                user_message=message,
-                conversation_id=conversation_id,
-                api_url=api_url,
+            result = run_ai(
+                "minecraft_chat_coze",
+                {"message": message, "conversation_id": conversation_id},
+                lambda: chat_with_bot(
+                    api_key=api_key,
+                    bot_id=bot_id,
+                    user_message=message,
+                    conversation_id=conversation_id,
+                    api_url=api_url,
+                ),
             )
         except RuntimeError as e:
             msg = str(e)

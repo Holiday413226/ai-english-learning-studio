@@ -28,64 +28,72 @@ export const SettingsContext = createContext({
 
 export default function App() {
   const setConfig = useConfigStore((s) => s.setConfig);
-  const cozeApiKey = useConfigStore((s) => s.cozeApiKey);
-  const deepseekApiKey = useConfigStore((s) => s.deepseekApiKey);
   const [keysRestored, setKeysRestored] = useState(false);
   const [showSetup, setShowSetup] = useState(false);
-  const [restoredKeys, setRestoredKeys] = useState({});
 
   // ── Restore keys from backend keyring_store on mount ──────
   useEffect(() => {
-    // If Zustand already has keys (from localStorage), skip restore
-    if (cozeApiKey || deepseekApiKey) {
-      setKeysRestored(true);
-      return;
-    }
+    const MANAGED_KEYS = [
+      "deepseekApiKey",
+      "cozeApiKey",
+      "debateBotId",
+      "discussBotId",
+      "minecraftBotId",
+      "aiMode",
+      "gatewayUrl",
+      "activationCode",
+    ];
 
-    // Fetch all keys from backend
+    const reconcile = (keys) => {
+      if (keys && keys.error) {
+        setKeysRestored(true);
+        return;
+      }
+      // Backend (encrypted file, survives EXE restart) is authoritative:
+      // non-empty backend values overwrite the localStorage cache.
+      const updates = {};
+      for (const k of MANAGED_KEYS) {
+        const v = keys && keys[k] ? String(keys[k]).trim() : "";
+        if (v) updates[k] = v;
+      }
+      if (Object.keys(updates).length > 0) {
+        setConfig(updates);
+      }
+
+      // First launch: no credentials anywhere → show setup.
+      // ``aiMode`` is a selector (defaults to "byok"), not a credential, so it
+      // is excluded from the "configured" check.
+      const CREDENTIAL_KEYS = [
+        "deepseekApiKey",
+        "cozeApiKey",
+        "debateBotId",
+        "discussBotId",
+        "minecraftBotId",
+        "gatewayUrl",
+        "activationCode",
+      ];
+      const store = useConfigStore.getState();
+      const backendHasCredential = CREDENTIAL_KEYS.some(
+        (k) => keys && keys[k] && String(keys[k]).trim()
+      );
+      const storeHasCredential = CREDENTIAL_KEYS.some(
+        (k) => store[k] && String(store[k]).trim()
+      );
+      if (!backendHasCredential && !storeHasCredential) {
+        setShowSetup(true);
+      }
+      setKeysRestored(true);
+    };
+
     fetch("/api/config/get")
       .then((r) => r.json())
-      .then((keys) => {
-        if (keys.error) return;
-        // Check if any key has a value
-        const hasKeys = Object.values(keys).some((v) => v && v.length > 0);
-        if (hasKeys) {
-          // Restore to Zustand
-          setConfig({
-            deepseekApiKey: keys.deepseekApiKey || "",
-            cozeApiKey: keys.cozeApiKey || "",
-            debateBotId: keys.debateBotId || "",
-            discussBotId: keys.discussBotId || "",
-            minecraftBotId: keys.minecraftBotId || "",
-          });
-          setRestoredKeys(keys);
-        } else {
-          // No keys configured — show SetupModal on first launch
-          setShowSetup(true);
-        }
-        setKeysRestored(true);
-      })
+      .then(reconcile)
       .catch(() => {
-        // Backend not ready yet — retry in 2s
+        // Backend not ready yet — retry in 2s.
         setTimeout(() => {
           fetch("/api/config/get")
             .then((r) => r.json())
-            .then((keys) => {
-              if (keys.error) { setShowSetup(true); setKeysRestored(true); return; }
-              const hasKeys = Object.values(keys).some((v) => v && v.length > 0);
-              if (hasKeys) {
-                setConfig({
-                  deepseekApiKey: keys.deepseekApiKey || "",
-                  cozeApiKey: keys.cozeApiKey || "",
-                  debateBotId: keys.debateBotId || "",
-                  discussBotId: keys.discussBotId || "",
-                  minecraftBotId: keys.minecraftBotId || "",
-                });
-              } else {
-                setShowSetup(true);
-              }
-              setKeysRestored(true);
-            })
+            .then(reconcile)
             .catch(() => { setShowSetup(true); setKeysRestored(true); });
         }, 2000);
       });
@@ -254,7 +262,6 @@ export default function App() {
           <SetupModal
             open={showSetup}
             onClose={() => setShowSetup(false)}
-            restoredKeys={restoredKeys}
             onGlitchTrigger={triggerGlitch}
           />
         )}

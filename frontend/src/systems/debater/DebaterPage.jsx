@@ -1,5 +1,5 @@
 /**
- * DebaterPage — COZE-powered English debate / discussion with voice.
+ * DebaterPage — DeepSeek/COZE-powered English debate / discussion with voice.
  *
  * Layout:
  *   +--------------------+----------------------------+
@@ -21,6 +21,7 @@ import SessionSidebar from "../../components/debater/SessionSidebar";
 import ChatBubble from "../../components/debater/ChatBubble";
 import ChatInput from "../../components/debater/ChatInput";
 import useConfigStore from "../../store/configStore";
+import useAiReady from "../../hooks/useAiReady";
 import useDebaterStore, { VoiceState } from "./store";
 import { SettingsContext } from "../../App";
 import { postChat, getDebateScore, getSessions, getSession } from "./api";
@@ -32,8 +33,11 @@ export default function DebaterPage() {
   const debateBotId = useConfigStore((s) => s.debateBotId);
   const discussBotId = useConfigStore((s) => s.discussBotId);
   const deepseekApiKey = useConfigStore((s) => s.deepseekApiKey);
+  const debateProvider = useConfigStore((s) => s.debateProvider);
   const ttsVoiceGender = useConfigStore((s) => s.ttsVoiceGender);
+  const setConfig = useConfigStore((s) => s.setConfig);
   const { openSettings } = useContext(SettingsContext);
+  const { hosted, deepseekReady, aiReady } = useAiReady();
 
   // ── Subsystem state ────────────────────────────────────────
   const {
@@ -55,9 +59,9 @@ export default function DebaterPage() {
   const [scoreResult, setScoreResult] = useState(null);
   const messagesEndRef = useRef(null);
 
-  // First-launch: if no COZE API key, open global settings
+  // First-launch: if no API key configured, open global settings
   useEffect(() => {
-    if (!cozeApiKey && !debateBotId && !discussBotId) {
+    if (!aiReady) {
       openSettings();
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -142,7 +146,7 @@ export default function DebaterPage() {
 
   // ── Scoring handler ──────────────────────────────────────
   const handleScore = useCallback(async () => {
-    if (!deepseekApiKey || !currentSessionId) return;
+    if (!deepseekReady || !currentSessionId) return;
     setScoring(true);
     setScoreResult(null);
     try {
@@ -153,24 +157,34 @@ export default function DebaterPage() {
     } finally {
       setScoring(false);
     }
-  }, [deepseekApiKey, currentSessionId]);
+  }, [deepseekReady, deepseekApiKey, currentSessionId]);
 
   // ── Send message handler ─────────────────────────────────
   const handleSend = useCallback(
     async (text) => {
       setError(null);
-      const botId = mode === "debate" ? debateBotId : discussBotId;
 
-      if (!botId) {
-        setError(
-          `No Bot ID configured for ${mode} mode. Click ⚙ to open Settings.`
-        );
-        return;
-      }
-
-      if (!cozeApiKey) {
-        setError("COZE API Key is required. Click ⚙ to open Settings.");
-        return;
+      // Validate the provider-specific requirements before sending.
+      // In hosted mode the real keys/bot IDs live on the gateway, so skip.
+      if (!hosted) {
+        if (debateProvider === "deepseek") {
+          if (!deepseekApiKey) {
+            setError("需要 DeepSeek API 密钥，点击 ⚙ 打开设置。");
+            return;
+          }
+        } else {
+          const botId = mode === "debate" ? debateBotId : discussBotId;
+          if (!botId) {
+            setError(
+              `未配置「${mode === "debate" ? "辩论" : "讨论"}」模式的 Bot ID，点击 ⚙ 打开设置。`
+            );
+            return;
+          }
+          if (!cozeApiKey) {
+            setError("需要 COZE API 密钥，点击 ⚙ 打开设置。");
+            return;
+          }
+        }
       }
 
       addMessage(currentSessionId, "user", text);
@@ -183,8 +197,12 @@ export default function DebaterPage() {
 
       try {
         const data = await postChat({
-          api_key: cozeApiKey,
-          bot_id: botId,
+          provider: debateProvider,
+          api_key: debateProvider === "deepseek" ? deepseekApiKey : cozeApiKey,
+          bot_id:
+            debateProvider === "coze"
+              ? mode === "debate" ? debateBotId : discussBotId
+              : "",
           session_id: currentSessionId,
           message: text,
           mode,
@@ -228,6 +246,9 @@ export default function DebaterPage() {
     },
     [
       mode,
+      hosted,
+      debateProvider,
+      deepseekApiKey,
       cozeApiKey,
       cozeApiUrl,
       debateBotId,
@@ -278,9 +299,28 @@ export default function DebaterPage() {
     <div className="page-content debater-page">
       <header className="debater-header">
         <h1>
-          {mode === "debate" ? "AI Debater" : "AI Discuss"}
+          {mode === "debate" ? "AI 辩论" : "AI 讨论"}
         </h1>
-        <p>COZE-powered English debate & discussion</p>
+        <p>
+          {debateProvider === "deepseek" ? "由 DeepSeek 驱动" : "由 COZE 驱动"}{" "}
+          英语辩论与讨论
+        </p>
+        <div className="debater-provider-toggle">
+          <button
+            type="button"
+            className={`nes-btn ${debateProvider === "deepseek" ? "is-primary" : ""}`}
+            onClick={() => setConfig({ debateProvider: "deepseek" })}
+          >
+            DeepSeek
+          </button>
+          <button
+            type="button"
+            className={`nes-btn ${debateProvider === "coze" ? "is-primary" : ""}`}
+            onClick={() => setConfig({ debateProvider: "coze" })}
+          >
+            COZE
+          </button>
+        </div>
       </header>
 
       <main className="debater-main">
@@ -292,8 +332,8 @@ export default function DebaterPage() {
               <div className="debater-welcome">
                 <p>
                   {mode === "debate"
-                    ? "Ready to debate! Type or voice your first argument."
-                    : "Ready to discuss! Type or voice your first thought."}
+                    ? "准备辩论！输入或语音说出你的第一个论点。"
+                    : "准备讨论！输入或语音说出你的第一个想法。"}
                 </p>
               </div>
             )}
@@ -315,7 +355,7 @@ export default function DebaterPage() {
             {loading && (
               <div className="debater-loading">
                 <progress className="nes-progress is-primary" max="100"></progress>
-                <p>Thinking...</p>
+                <p>思考中…</p>
               </div>
             )}
 
@@ -332,13 +372,13 @@ export default function DebaterPage() {
                   className="nes-btn is-success"
                   style={{ fontSize: "0.75rem" }}
                   onClick={handleScore}
-                  disabled={scoring || !deepseekApiKey}
+                  disabled={scoring || !deepseekReady}
                 >
-                  {scoring ? "Scoring..." : "Score this Debate"}
+                  {scoring ? "批改中…" : "批改本次辩论"}
                 </button>
-                {!deepseekApiKey && (
+                {!deepseekReady && (
                   <p style={{ fontSize: "0.65rem", color: "var(--danger)", marginTop: 4 }}>
-                    DeepSeek API Key required for scoring. Configure in Settings.
+                    评分需要 DeepSeek API 密钥，请在设置中配置。
                   </p>
                 )}
               </div>
@@ -348,14 +388,14 @@ export default function DebaterPage() {
             {scoreResult && !scoreResult.error && (
               <div className="window" style={{ padding: "14px 18px", marginTop: 8 }}>
                 <h4 style={{ fontSize: "0.8rem", color: "var(--accent)", margin: "0 0 10px", fontFamily: "var(--font-mono)" }}>
-                  Debate Score
+                  辩论评分
                 </h4>
                 <div style={{ display: "flex", gap: 12, marginBottom: 10 }}>
                   {[
-                    { k: "grammar", label: "Grammar", max: 10 },
-                    { k: "vocabulary", label: "Vocabulary", max: 10 },
-                    { k: "logic", label: "Logic", max: 10 },
-                    { k: "fluency", label: "Fluency", max: 10 },
+                    { k: "grammar", label: "语法", max: 10 },
+                    { k: "vocabulary", label: "词汇", max: 10 },
+                    { k: "logic", label: "逻辑", max: 10 },
+                    { k: "fluency", label: "流畅度", max: 10 },
                   ].map(({ k, label, max }) => (
                     <div key={k} style={{ flex: 1, textAlign: "center" }}>
                       <div style={{ fontSize: "0.6rem", color: "var(--text-muted)" }}>{label}</div>
@@ -367,7 +407,7 @@ export default function DebaterPage() {
                 </div>
                 {(scoreResult.suggestions || []).length > 0 && (
                   <div>
-                    <p style={{ fontSize: "0.65rem", color: "var(--text-secondary)", marginBottom: 4 }}>Suggestions:</p>
+                    <p style={{ fontSize: "0.65rem", color: "var(--text-secondary)", marginBottom: 4 }}>建议：</p>
                     {scoreResult.suggestions.map((s, i) => (
                       <p key={i} style={{ fontSize: "0.65rem", color: "var(--text-muted)", margin: "2px 0", paddingLeft: 8 }}>
                         - {s}
@@ -380,7 +420,7 @@ export default function DebaterPage() {
 
             {scoreResult?.error && (
               <div className="debater-error">
-                <p>Score failed: {scoreResult.error}</p>
+                <p>评分失败：{scoreResult.error}</p>
               </div>
             )}
 

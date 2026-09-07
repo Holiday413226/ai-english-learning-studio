@@ -72,7 +72,7 @@ export default function PhoneRelayModal({ open, onClose, onSend }) {
   return (
     <div className="relay-modal-overlay" onClick={onClose}>
       <div className="relay-modal" onClick={(e) => e.stopPropagation()}>
-        <h3 style={{ fontSize: "0.8rem", margin: "0 0 12px", color: "var(--text-primary)" }}>Phone Voice Input</h3>
+        <h3 style={{ fontSize: "0.8rem", margin: "0 0 12px", color: "var(--text-primary)" }}>手机语音输入</h3>
 
         {relayUrl ? (
           <>
@@ -87,17 +87,17 @@ export default function PhoneRelayModal({ open, onClose, onSend }) {
           </>
         ) : (
           <p style={{ fontSize: "0.7rem", color: "var(--danger)", textAlign: "center" }}>
-            Backend not reachable. Make sure the server is running.
+            后端不可达，请确认服务器正在运行。
           </p>
         )}
 
         <div style={{ textAlign: "center", marginBottom: 12 }}>
           {relayStatus === "waiting" && (
-            <span style={{ fontSize: "0.7rem", color: "var(--accent)" }}>Waiting for input...</span>
+            <span style={{ fontSize: "0.7rem", color: "var(--accent)" }}>等待输入…</span>
           )}
           {relayStatus === "received" && (
             <div>
-              <span style={{ fontSize: "0.7rem", color: "var(--accent)" }}>Received:</span>
+              <span style={{ fontSize: "0.7rem", color: "var(--accent)" }}>已收到：</span>
               <p style={{ fontSize: "0.75rem", color: "var(--text-primary)", margin: "8px 0", padding: "8px", background: "var(--bg-input)", borderRadius: 6 }}>
                 {relayText}
               </p>
@@ -108,11 +108,11 @@ export default function PhoneRelayModal({ open, onClose, onSend }) {
         <div style={{ display: "flex", gap: 8, justifyContent: "center" }}>
           {relayStatus === "received" && (
             <button className="nes-btn is-success" style={{ fontSize: "0.7rem" }} onClick={handleSend}>
-              Send
+              发送
             </button>
           )}
           <button className="nes-btn" style={{ fontSize: "0.7rem" }} onClick={onClose}>
-            Cancel
+            取消
           </button>
         </div>
       </div>

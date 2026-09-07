@@ -34,21 +34,13 @@ export default function VocabStar({ word, context, sourceModule, apiKey, onSaved
 
   return (
     <button
-      className="vocab-star-btn"
+      className={`vocab-star-btn${saved ? " is-saved" : ""}`}
       onClick={handleClick}
       disabled={saving || saved}
-      title={saved ? "Saved to Vocab Vault" : "Save to Vocab Vault"}
-      style={{
-        background: "none",
-        border: "none",
-        cursor: saved ? "default" : "pointer",
-        fontSize: "1rem",
-        padding: "2px 4px",
-        opacity: saved ? 0.6 : 1,
-        transition: "transform 0.15s",
-      }}
+      title={saved ? "已收藏到词汇库" : "收藏到词汇库"}
+      aria-label={saved ? "已收藏到词汇库" : "收藏到词汇库"}
     >
-      {saved ? "⭐" : saving ? "⏳" : "☆"}
+      {saving ? "⏳" : "★"}
     </button>
   );
 }

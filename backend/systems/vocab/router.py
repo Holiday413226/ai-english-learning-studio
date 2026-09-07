@@ -8,11 +8,13 @@ GET    /api/vocab/quiz         — generate quiz
 GET    /api/vocab/export       — CSV export
 GET    /api/vocab/stats        — aggregate statistics
 GET    /api/vocab/due          — words due for review
+GET    /api/vocab/flashcards   — flashcard practice deck (due-first, fallback to all)
 """
 
 from flask import request, jsonify, Response
 from systems.vocab.vault import vocab_vault
 from systems.vocab.ai_definer import define_word
+from core.gateway_client import run_ai, is_hosted
 
 
 def register_vocab_routes(app):
@@ -36,9 +38,13 @@ def register_vocab_routes(app):
             return jsonify({"error": "source_module must be one of: novel, diary, debater, minecraft"}), 400
 
         definition_en = definition_zh = phonetic = example_sentence = ""
-        if api_key:
+        if api_key or is_hosted():
             try:
-                definition = define_word(api_key, word, context)
+                definition = run_ai(
+                    "vocab_define",
+                    {"word": word, "context": context},
+                    lambda: define_word(api_key, word, context),
+                )
                 phonetic = definition.get("phonetic", "")
                 definition_en = definition.get("definition_en", "")
                 definition_zh = definition.get("definition_zh", "")
@@ -136,7 +142,18 @@ def register_vocab_routes(app):
 
     @app.route("/api/vocab/due", methods=["GET"])
     def vocab_due():
-        """Return words due for review (SM-2)."""
+        """Return a flashcard deck: due words first, falling back to recently
+        reviewed words so the user can re-run a deck after finishing a pass.
+        Kept for backward compatibility with older frontend builds."""
         limit = request.args.get("limit", 20, type=int)
-        due = vocab_vault.words_due_for_review(limit=limit)
-        return jsonify({"words": due, "total": len(due)})
+        limit = min(max(limit, 1), 200)
+        words = vocab_vault.get_flashcards(limit=limit)
+        return jsonify({"words": words, "total": len(words)})
+
+    @app.route("/api/vocab/flashcards", methods=["GET"])
+    def vocab_flashcards():
+        """Return a flashcard practice deck (due-first, fallback to all)."""
+        limit = request.args.get("limit", 30, type=int)
+        limit = min(max(limit, 1), 200)
+        words = vocab_vault.get_flashcards(limit=limit)
+        return jsonify({"words": words, "total": len(words)})

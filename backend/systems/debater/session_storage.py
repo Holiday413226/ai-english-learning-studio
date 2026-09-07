@@ -11,6 +11,8 @@ import uuid
 import threading
 from pathlib import Path
 
+from core.paths import get_data_root
+
 
 class DebaterSessionStorage:
     """Thread-safe JSON file persistence for Debater chat sessions."""
@@ -20,7 +22,7 @@ class DebaterSessionStorage:
 
     def __init__(self, data_dir: str = None):
         if data_dir is None:
-            data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data")
+            data_dir = get_data_root()
         self._system_dir = Path(data_dir) / "debater"
         self._system_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()
@@ -138,10 +140,11 @@ class DebaterSessionStorage:
             "updated_at": session.get("updated_at", 0),
         }
 
-    def get_messages_for_scoring(self, session_id: str) -> list[dict] | None:
-        """Return the message list for scoring, or None if the session doesn't exist.
+    def get_messages(self, session_id: str) -> list[dict] | None:
+        """Return the user/assistant message list (role+content), or None.
 
-        Only returns user and assistant messages with role+content — no metadata.
+        Used by the DeepSeek provider to rebuild the full conversation
+        history — only role and content are included, no metadata.
         """
         session = self.load(session_id)
         if session is None:
@@ -151,6 +154,14 @@ class DebaterSessionStorage:
             for m in session.get("messages", [])
             if m.get("role") in ("user", "assistant")
         ]
+
+    def get_messages_for_scoring(self, session_id: str) -> list[dict] | None:
+        """Return the message list for scoring, or None if the session doesn't exist.
+
+        Delegates to :meth:`get_messages` — the scoring transcript and the
+        DeepSeek chat history are the same shape.
+        """
+        return self.get_messages(session_id)
 
     def delete(self, session_id: str) -> bool:
         """Delete a session file. Returns True if it existed."""

@@ -1,0 +1,12 @@
+services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "9000:9000"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/gateway/data
+    restart: unless-stopped

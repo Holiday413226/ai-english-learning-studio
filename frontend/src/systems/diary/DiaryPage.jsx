@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import useConfigStore from "../../store/configStore";
+import useAiReady from "../../hooks/useAiReady";
 import VocabStar from "../../components/vocab/VocabStar";
 import { submitDiary, getDiaryEntries, getDiaryStreak } from "./api";
 
@@ -16,6 +17,7 @@ function todayStr() {
 
 export default function DiaryPage() {
   const deepseekApiKey = useConfigStore((s) => s.deepseekApiKey);
+  const { deepseekReady } = useAiReady();
 
   const [text, setText] = useState("");
   const [result, setResult] = useState(null);   // {corrections, score, highlighted_expressions}
@@ -51,8 +53,8 @@ export default function DiaryPage() {
   return (
     <div className="page-content">
       <header>
-        <h1>English Diary</h1>
-        <p>Write daily · AI corrections · build your writing habit</p>
+        <h1>英语日记</h1>
+        <p>每日写作 · AI 批改 · 养成写作习惯</p>
       </header>
 
       <main style={{ display: "flex", gap: 16, flex: 1, flexWrap: "wrap" }}
@@ -62,14 +64,14 @@ export default function DiaryPage() {
           <h3 className="window-title">{todayStr()}</h3>
 
           <div style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: 10 }}>
-            <span style={{ color: "var(--accent)" }}>Prompt: </span>
+            <span style={{ color: "var(--accent)" }}>题目：</span>
             {prompt}
           </div>
 
           <textarea
             className="nes-textarea debater-text-input"
             style={{ flex: 1, minHeight: 180, fontFamily: "var(--font-sans)", fontSize: "0.85rem" }}
-            placeholder="Start writing your diary in English..."
+            placeholder="开始用英语写日记…"
             value={text}
             onChange={(e) => { setText(e.target.value); setSubmitted(false); }}
           />
@@ -78,21 +80,21 @@ export default function DiaryPage() {
             className="nes-btn is-primary block-btn"
             style={{ marginTop: 12 }}
             onClick={handleSubmit}
-            disabled={loading || !text.trim() || !deepseekApiKey}
+            disabled={loading || !text.trim() || !deepseekReady}
           >
-            {loading ? "Analyzing..." : "Submit for Review"}
+            {loading ? "分析中…" : "提交批改"}
           </button>
 
-          {!deepseekApiKey && (
+          {!deepseekReady && (
             <p style={{ fontSize: "0.65rem", color: "var(--danger)", marginTop: 6 }}>
-              DeepSeek API Key required. Configure in Settings.
+              需要 DeepSeek API 密钥，请在设置中配置。
             </p>
           )}
         </div>
 
         {/* ── Right Panel — Results ───────────────────────── */}
         <div className="window window-col" style={{ minWidth: 280 }}>
-          <h3 className="window-title">Corrections & Score</h3>
+          <h3 className="window-title">批改与评分</h3>
 
           {error && (
             <div className="debater-error">
@@ -103,7 +105,7 @@ export default function DiaryPage() {
           {loading && (
             <div className="debater-loading">
               <progress className="nes-progress is-primary" max="100" style={{ width: "100%" }}></progress>
-              <p>Grading your diary...</p>
+              <p>正在批改你的日记…</p>
             </div>
           )}
 
@@ -112,9 +114,9 @@ export default function DiaryPage() {
               {/* Score card */}
               <div style={{ display: "flex", gap: 12, marginBottom: 14 }}>
                 {[
-                  { k: "grammar", label: "Grammar", color: "var(--accent)" },
-                  { k: "vocabulary", label: "Vocab", color: "var(--highlight)" },
-                  { k: "fluency", label: "Fluency", color: "#ffd700" },
+                  { k: "grammar", label: "语法", color: "var(--accent)" },
+                  { k: "vocabulary", label: "词汇", color: "var(--highlight)" },
+                  { k: "fluency", label: "流畅度", color: "#ffd700" },
                 ].map(({ k, label, color }) => (
                   <div key={k} style={{ flex: 1, textAlign: "center" }}>
                     <div style={{ fontSize: "0.6rem", color: "var(--text-muted)", fontFamily: "var(--font-mono)" }}>
@@ -149,7 +151,7 @@ export default function DiaryPage() {
               {(result.highlighted_expressions || []).length > 0 && (
                 <div style={{ marginTop: 14, borderTop: "1px solid var(--border-default)", paddingTop: 10 }}>
                   <p style={{ fontSize: "0.65rem", color: "var(--accent)", fontFamily: "var(--font-mono)", marginBottom: 6 }}>
-                    Highlighted Expressions
+                    亮点表达
                   </p>
                   {result.highlighted_expressions.map((expr, i) => (
                     <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
@@ -167,7 +169,7 @@ export default function DiaryPage() {
 
               {!result.corrections?.length && !result.highlighted_expressions?.length && submitted && (
                 <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", textAlign: "center" }}>
-                  Your submission has been reviewed. No major issues found!
+                  你的日记已批改，未发现重大问题！
                 </p>
               )}
             </div>
@@ -176,8 +178,7 @@ export default function DiaryPage() {
           {!result && !loading && !error && (
             <div className="placeholder-box">
               <p>
-                Your AI-corrected diary will appear here <br />
-                after you submit your entry.
+                提交日记后，AI 批改结果将显示在这里。
               </p>
             </div>
           )}

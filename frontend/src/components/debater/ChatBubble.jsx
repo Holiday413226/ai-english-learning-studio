@@ -13,7 +13,7 @@ export default function ChatBubble({ message, isTyping, apiKey }) {
   return (
     <div className={`debater-bubble ${isUser ? "debater-bubble--user" : ""}`}>
       <div className="debater-bubble-avatar">
-        {isUser ? "Y" : "AI"}
+        {isUser ? "我" : "AI"}
       </div>
       <div
         className={`debater-bubble-content ${isUser ? "is-user" : "is-ai"}`}
@@ -40,9 +40,9 @@ export default function ChatBubble({ message, isTyping, apiKey }) {
           <button
             className="nes-btn is-primary debater-audio-btn"
             onClick={() => new Audio(message.audioUrl).play()}
-            title="Play voice response"
+            title="播放语音回复"
           >
-            Play
+            播放
           </button>
         )}
       </div>

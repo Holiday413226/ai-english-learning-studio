@@ -21,16 +21,31 @@ POLL_INTERVAL = 1.5   # seconds between status checks
 POLL_TIMEOUT = 60     # max seconds to wait for completion
 
 
+def _safe_stderr(msg: str) -> None:
+    """Write to stderr without ever raising (emoji/GBK/broken-pipe safe).
+
+    Debug output is best-effort — it must never break an in-flight request.
+    On Chinese Windows the console (and a ``console=False`` EXE's stderr)
+    is GBK-encoded, so printing a COZE reply containing an emoji would
+    otherwise raise ``UnicodeEncodeError`` and turn the response into an
+    HTML 500 page.
+    """
+    try:
+        print(msg, file=sys.stderr)
+    except Exception:
+        pass
+
+
 def _debug(title, obj):
     """Print debug info to stderr so it shows in the Flask console."""
-    print(f"\n{'='*60}", file=sys.stderr)
-    print(f"  {title}", file=sys.stderr)
-    print(f"{'='*60}", file=sys.stderr)
+    _safe_stderr(f"\n{'='*60}")
+    _safe_stderr(f"  {title}")
+    _safe_stderr(f"{'='*60}")
     if isinstance(obj, str):
-        print(obj[:4000], file=sys.stderr)
+        _safe_stderr(obj[:4000])
     else:
-        print(json.dumps(obj, indent=2, ensure_ascii=False)[:4000], file=sys.stderr)
-    print(f"{'='*60}\n", file=sys.stderr)
+        _safe_stderr(json.dumps(obj, indent=2, ensure_ascii=True)[:4000])
+    _safe_stderr(f"{'='*60}\n")
 
 
 def _extract_text_from_messages(messages) -> str:
@@ -210,13 +225,12 @@ def chat_with_bot(
                 timeout=15,
             )
         except requests.exceptions.RequestException as e:
-            print(f"  [poll #{poll_count}] request failed: {e}", file=sys.stderr)
+            _safe_stderr(f"  [poll #{poll_count}] request failed: {e}")
             continue
 
         if r.status_code != 200:
-            print(
-                f"  [poll #{poll_count}] HTTP {r.status_code}: {r.text[:200]}",
-                file=sys.stderr,
+            _safe_stderr(
+                f"  [poll #{poll_count}] HTTP {r.status_code}: {r.text[:200]}"
             )
             continue
 
@@ -235,9 +249,8 @@ def chat_with_bot(
                 })
             status = new_status
 
-        print(
-            f"  [poll #{poll_count}] status={status}  ({time.time() - start_time:.1f}s elapsed)",
-            file=sys.stderr,
+        _safe_stderr(
+            f"  [poll #{poll_count}] status={status}  ({time.time() - start_time:.1f}s elapsed)"
         )
 
     if status == "failed":

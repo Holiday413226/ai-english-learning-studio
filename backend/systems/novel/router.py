@@ -11,6 +11,7 @@ import traceback
 from flask import request, jsonify
 from systems.novel.translator import translate, quick_define
 from systems.novel.session_storage import novel_storage
+from core.gateway_client import run_ai, is_hosted
 
 
 def register_novel_routes(app):
@@ -36,7 +37,7 @@ def register_novel_routes(app):
         vocab_text = (data.get("vocab_text", "") or "").strip()
         session_id = (data.get("session_id", "") or "").strip()
 
-        if not api_key:
+        if not api_key and not is_hosted():
             return jsonify({"error": "API Key is required"}), 400
         if not novel_text:
             return jsonify({"error": "Novel text is required"}), 400
@@ -46,7 +47,11 @@ def register_novel_routes(app):
             vocab_list = [w.strip() for w in vocab_text.split("\n") if w.strip()]
 
         try:
-            result = translate(api_key, novel_text, vocab_list)
+            result = run_ai(
+                "novel_translate",
+                {"novel_text": novel_text, "vocab_list": vocab_list},
+                lambda: translate(api_key, novel_text, vocab_list),
+            )
         except Exception as e:
             traceback.print_exc()
             error_msg = str(e)
@@ -87,11 +92,15 @@ def register_novel_routes(app):
 
         if not word:
             return jsonify({"error": "'word' query parameter is required"}), 400
-        if not api_key:
+        if not api_key and not is_hosted():
             return jsonify({"error": "'api_key' query parameter is required"}), 400
 
         try:
-            result = quick_define(api_key, word, context)
+            result = run_ai(
+                "novel_define",
+                {"word": word, "context": context},
+                lambda: quick_define(api_key, word, context),
+            )
         except RuntimeError as e:
             error_msg = str(e)
             if "Invalid DeepSeek API Key" in error_msg:

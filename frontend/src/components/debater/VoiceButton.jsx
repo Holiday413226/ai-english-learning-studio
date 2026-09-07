@@ -120,18 +120,18 @@ export default function VoiceButton({ disabled, onResult }) {
   if (!isSupported) {
     return (
       <div className="debater-voice-unsupported">
-        <p>Voice requires Chrome browser</p>
+        <p>语音功能需要 Chrome 浏览器</p>
       </div>
     );
   }
 
   const stateLabels = {
-    [VoiceState.IDLE]: "Tap to speak",
-    [VoiceState.RECORDING]: "Recording... tap to stop",
-    [VoiceState.TRANSCRIBING]: "Transcribing...",
-    [VoiceState.THINKING]: "AI is thinking...",
-    [VoiceState.SPEAKING]: "AI is speaking...",
-    [VoiceState.ERROR]: `Error: ${micError || "Retry"}`,
+    [VoiceState.IDLE]: "点击说话",
+    [VoiceState.RECORDING]: "录音中… 点击停止",
+    [VoiceState.TRANSCRIBING]: "识别中…",
+    [VoiceState.THINKING]: "AI 思考中…",
+    [VoiceState.SPEAKING]: "AI 朗读中…",
+    [VoiceState.ERROR]: `错误：${micError || "重试"}`,
   };
 
   return (
@@ -142,14 +142,14 @@ export default function VoiceButton({ disabled, onResult }) {
           <button
             className={`debater-lang-btn ${asrLang === "zh-CN" ? "on" : ""}`}
             onClick={() => setAsrLang("zh-CN")}
-            title="Chinese"
+            title="中文"
           >
             中
           </button>
           <button
             className={`debater-lang-btn ${asrLang === "en-US" ? "on" : ""}`}
             onClick={() => setAsrLang("en-US")}
-            title="English"
+            title="英文"
           >
             EN
           </button>
@@ -159,26 +159,26 @@ export default function VoiceButton({ disabled, onResult }) {
           <button
             className={`debater-gender-btn ${ttsVoiceGender === "female" ? "on" : ""}`}
             onClick={() => setConfig({ ttsVoiceGender: "female" })}
-            title="Female voice"
+            title="女声"
           >
-            F
+            女
           </button>
           <button
             className={`debater-gender-btn ${ttsVoiceGender === "male" ? "on" : ""}`}
             onClick={() => setConfig({ ttsVoiceGender: "male" })}
-            title="Male voice"
+            title="男声"
           >
-            M
+            男
           </button>
         </div>
 
         <button
           className="debater-phone-btn nes-btn is-primary"
           onClick={() => setRelayOpen(true)}
-          title="Phone voice input"
+          title="手机语音输入"
           style={{ fontSize: "0.65rem", padding: "2px 8px" }}
         >
-          Phone
+          手机
         </button>
       </div>
 
@@ -205,7 +205,7 @@ export default function VoiceButton({ disabled, onResult }) {
           voiceState === VoiceState.SPEAKING
         }
       >
-        {voiceState === VoiceState.RECORDING ? "Stop" : "Record"}
+        {voiceState === VoiceState.RECORDING ? "停止" : "录音"}
       </button>
       <span className="debater-voice-status">
         {stateLabels[voiceState]}

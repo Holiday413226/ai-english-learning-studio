@@ -1,0 +1,9 @@
+# Caddyfile — HTTPS 反向代理到网关（端口 9000）。
+#
+# DOMAIN 通过环境变量注入（deploy.sh 会 `-e DOMAIN=你的域名`）。
+# 手动运行时：docker run ... -e DOMAIN=your-domain.com ...
+# 前提：域名已解析到本机 IP；国内服务器域名需已完成 ICP 备案。
+
+{$DOMAIN} {
+    reverse_proxy 127.0.0.1:9000
+}

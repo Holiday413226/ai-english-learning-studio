@@ -11,20 +11,20 @@ export default function ReaderModal({ htmlContent, highlightCount, onClose }) {
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
-      aria-label="Full-screen reader"
+      aria-label="全屏阅读器"
     >
       <div className="reader-container">
         <div className="reader-header">
-          <h2>Full-Screen Reader</h2>
+          <h2>全屏阅读器</h2>
           <span className="reader-stats">
-            {highlightCount} vocab words highlighted
+            已高亮 {highlightCount} 个词汇
           </span>
           <button
             type="button"
             className="nes-btn is-error reader-close"
             onClick={onClose}
           >
-            Close
+            关闭
           </button>
         </div>
         <div className="reader-body">

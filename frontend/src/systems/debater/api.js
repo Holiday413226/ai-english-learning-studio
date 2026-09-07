@@ -7,7 +7,7 @@
 
 const API_BASE = "/api/debater";
 
-export async function postChat({ api_key, bot_id, session_id, message, mode, api_url }) {
+export async function postChat({ api_key, bot_id, session_id, message, mode, api_url, provider }) {
   const response = await fetch(`${API_BASE}/chat`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -18,6 +18,7 @@ export async function postChat({ api_key, bot_id, session_id, message, mode, api
       message,
       mode,
       api_url,
+      provider,
     }),
   });
 

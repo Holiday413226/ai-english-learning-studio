@@ -11,6 +11,8 @@ import random
 from pathlib import Path
 from datetime import datetime, timezone
 
+from core.paths import get_data_root
+
 
 class VocabVault:
     """Thread-safe vocabulary storage with SM-2 spaced repetition."""
@@ -19,9 +21,7 @@ class VocabVault:
 
     def __init__(self, data_dir: str = None):
         if data_dir is None:
-            data_dir = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "..", "..", "data"
-            )
+            data_dir = get_data_root()
         self._system_dir = Path(data_dir) / "vocab"
         self._system_dir.mkdir(parents=True, exist_ok=True)
         self._vault_file = self._system_dir / "vault.json"
@@ -149,6 +149,26 @@ class VocabVault:
         due = [w for w in data["words"].values() if w.get("next_review", "") <= now]
         due.sort(key=lambda w: w.get("next_review", ""))
         return due[:limit]
+
+    def get_flashcards(self, limit: int = 30) -> list[dict]:
+        """Return a practice deck for the flashcard tab.
+
+        Due words first (SM-2 scheduling). If nothing is due — e.g. the user
+        just finished a pass and every word got rescheduled to a future day —
+        fall back to the most recently reviewed words so a refresh can re-run
+        the deck for repeated practice.
+        """
+        due = self.words_due_for_review(limit=limit)
+        if due:
+            return due
+
+        data = self._read_all()
+        words = list(data["words"].values())
+        words.sort(
+            key=lambda w: w.get("last_reviewed") or w.get("created_at", ""),
+            reverse=True,
+        )
+        return words[:limit]
 
     # ── Quiz Generation ────────────────────────────────────────────
 

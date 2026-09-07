@@ -28,6 +28,14 @@ const useConfigStore = create(
       // ── DeepSeek (Novel translation) ───────────────────────────
       deepseekApiKey: "",
 
+      // ── Hosted gateway mode ─────────────────────────────────────
+      aiMode: "byok",          // "byok" (bring your own key) | "hosted"
+      gatewayUrl: "",
+      activationCode: "",
+
+      // ── Debater provider ────────────────────────────────────────
+      debateProvider: "deepseek",  // "deepseek" | "coze"
+
       // ── Actions ─────────────────────────────────────────────────
       setConfig: (updates) =>
         set((state) => {
@@ -38,9 +46,12 @@ const useConfigStore = create(
           return next;
         }),
 
-      /** True if at least one API key is configured. */
+      /** True if at least one API key is configured (or hosted mode is set). */
       isConfigured: () => {
         const s = get();
+        if (s.aiMode === "hosted") {
+          return !!(s.gatewayUrl && s.activationCode);
+        }
         return !!(s.cozeApiKey || s.deepseekApiKey);
       },
 

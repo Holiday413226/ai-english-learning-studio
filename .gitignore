@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .env
+.pytest_cache/
 
 # Node
 frontend/node_modules/
@@ -11,6 +12,7 @@ frontend/dist/
 
 # Built frontend (CI generates this)
 backend/static/
+backend/static_zh/
 
 # PyInstaller output
 backend/build/
@@ -19,6 +21,9 @@ backend/dist/
 
 # Runtime data (session JSON files, generated at runtime)
 backend/data/
+
+# Gateway runtime data (activation-code SQLite DB — DO NOT commit codes)
+gateway/data/
 
 # Runtime config (generated on first launch)
 backend/config.json

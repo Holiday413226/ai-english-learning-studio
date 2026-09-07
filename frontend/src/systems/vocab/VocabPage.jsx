@@ -5,14 +5,14 @@
  */
 import { useState, useEffect, useCallback } from "react";
 import useConfigStore from "../../store/configStore";
-import { listWords, deleteWord, reviewWord, getDueWords, getQuiz, exportCSV } from "./api";
+import { listWords, deleteWord, reviewWord, getFlashcards, getQuiz, exportCSV } from "./api";
 
-const TABS = ["Word List", "Flashcards", "Quiz"];
+const TABS = ["单词列表", "闪卡", "测验"];
 
 const QUALITY_LABELS = [
-  { q: 0, label: "Forgot", cls: "is-error" },
-  { q: 3, label: "Unsure", cls: "is-warning" },
-  { q: 5, label: "Got It", cls: "is-success" },
+  { q: 0, label: "忘记了", cls: "is-error" },
+  { q: 3, label: "不确定", cls: "is-warning" },
+  { q: 5, label: "会了", cls: "is-success" },
 ];
 
 export default function VocabPage() {
@@ -84,7 +84,7 @@ export default function VocabPage() {
     setError(null);
     setFlashcardLoading(true);
     try {
-      const data = await getDueWords(30);
+      const data = await getFlashcards(30);
       setDueWords(data.words);
       setCardIdx(0);
       setFlipped(false);
@@ -154,13 +154,13 @@ export default function VocabPage() {
 
   // ── Render: Tab 0 — Word List ────────────────────────────
   const renderWordList = () => {
-    if (loading) return <p style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>Loading...</p>;
+    if (loading) return <p style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>加载中…</p>;
     if (error) return <div className="debater-error"><p>{error}</p></div>;
     if (words.length === 0) return (
       <div className="placeholder-box">
         <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", textAlign: "center" }}>
-          No words yet! <br />
-          Click the star on words in any module to save them here.
+          还没有单词！<br />
+          在任意模块点击单词旁的星星收藏到这里。
         </p>
       </div>
     );
@@ -168,21 +168,21 @@ export default function VocabPage() {
     return (
       <div>
         <div style={{ display: "flex", gap: 10, marginBottom: 14, alignItems: "center", flexWrap: "wrap" }}>
-          <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{total} words</span>
+          <span style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>{total} 个单词</span>
           <select className="nes-input" style={{ fontSize: "0.7rem", width: "auto", padding: "4px 8px" }}
             value={sortBy} onChange={(e) => setSortBy(e.target.value)}>
-            <option value="created_at">Date Added</option>
-            <option value="word">Alphabetical</option>
-            <option value="next_review">Next Review</option>
-            <option value="review_count">Most Reviewed</option>
+            <option value="created_at">添加时间</option>
+            <option value="word">字母顺序</option>
+            <option value="next_review">下次复习</option>
+            <option value="review_count">复习次数</option>
           </select>
           <button className="nes-btn is-success" style={{ fontSize: "0.65rem", padding: "6px 10px" }}
             onClick={() => setOrder(o => o === "desc" ? "asc" : "desc")}>
-            {order === "desc" ? "Newest" : "Oldest"}
+            {order === "desc" ? "最新" : "最旧"}
           </button>
           <button className="nes-btn is-primary" style={{ fontSize: "0.65rem", padding: "6px 10px", marginLeft: "auto" }}
             onClick={handleExport}>
-            CSV Export
+            导出 CSV
           </button>
         </div>
 
@@ -200,7 +200,7 @@ export default function VocabPage() {
                 {w.source_module}
               </span>
               <button className="nes-btn is-error" style={{ fontSize: "0.65rem", padding: "4px 8px" }}
-                onClick={() => handleDelete(w.word)}>Delete</button>
+                onClick={() => handleDelete(w.word)}>删除</button>
             </div>
           ))}
         </div>
@@ -213,7 +213,7 @@ export default function VocabPage() {
     if (flashcardLoading) {
       return (
         <div style={{ textAlign: "center", padding: "40px 0" }}>
-          <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>Loading flashcards...</p>
+          <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)" }}>加载闪卡中…</p>
         </div>
       );
     }
@@ -225,7 +225,7 @@ export default function VocabPage() {
             <p>{error}</p>
           </div>
           <button className="nes-btn is-primary" style={{ fontSize: "0.75rem", marginTop: 16 }}
-            onClick={loadFlashcards}>Retry</button>
+            onClick={loadFlashcards}>重试</button>
         </div>
       );
     }
@@ -235,24 +235,24 @@ export default function VocabPage() {
         <div style={{ textAlign: "center", padding: "40px 0" }}>
           <div className="placeholder-box">
             <p style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
-              All caught up! No words due for review.
+              本轮复习完成！点击「刷新」可重新再练一遍。
             </p>
           </div>
           <button className="nes-btn is-primary" style={{ fontSize: "0.75rem", marginTop: 16 }}
-            onClick={loadFlashcards}>Refresh</button>
+            onClick={loadFlashcards}>刷新</button>
         </div>
       );
     }
 
     const card = dueWords[cardIdx];
     if (!card) {
-      return <p style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>Loading flashcards...</p>;
+      return <p style={{ color: "var(--text-secondary)", fontSize: "0.8rem" }}>加载闪卡中…</p>;
     }
 
     return (
       <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
         <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)" }}>
-          Card {cardIdx + 1} of {dueWords.length}
+          第 {cardIdx + 1} / {dueWords.length} 张
         </p>
 
         {/* ── Card ──────────────────────────────────────── */}
@@ -274,7 +274,7 @@ export default function VocabPage() {
                 {card.word}
               </div>
               {card.phonetic && <div style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: 8 }}>{card.phonetic}</div>}
-              <div style={{ fontSize: "0.65rem", color: "var(--text-muted)", marginTop: 12 }}>click to flip</div>
+              <div style={{ fontSize: "0.65rem", color: "var(--text-muted)", marginTop: 12 }}>点击翻面</div>
             </>
           ) : (
             <>
@@ -290,7 +290,7 @@ export default function VocabPage() {
                 </div>
               )}
               <div style={{ fontSize: "0.65rem", color: "var(--text-muted)", marginTop: 8 }}>
-                from: {card.source_module || "unknown"}
+                来自：{card.source_module || "未知"}
               </div>
             </>
           )}
@@ -315,11 +315,11 @@ export default function VocabPage() {
       return (
         <div style={{ textAlign: "center", padding: "40px 0" }}>
           <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", marginBottom: 16 }}>
-            Test yourself with 10 multiple-choice questions from your Vocab Vault.
+            用词汇库中的 10 道选择题测试自己。
           </p>
           <button className="nes-btn is-primary" style={{ fontSize: "0.8rem" }}
             onClick={startQuiz} disabled={total < 4}>
-            {total < 4 ? "Need at least 4 words in vault" : "Start Quiz"}
+            {total < 4 ? "词汇库中至少需要 4 个单词" : "开始测验"}
           </button>
         </div>
       );
@@ -338,13 +338,13 @@ export default function VocabPage() {
             return (
               <div key={i} className="window" style={{ padding: "10px 14px", marginBottom: 8, textAlign: "left" }}>
                 <span style={{ fontSize: "0.8rem", color: "var(--accent)" }}>{a.word}</span>
-                <span style={{ fontSize: "0.7rem", color: "var(--danger)", marginLeft: 8 }}>Correct: {opt?.options[a.correctIdx]}</span>
+                <span style={{ fontSize: "0.7rem", color: "var(--danger)", marginLeft: 8 }}>正确答案：{opt?.options[a.correctIdx]}</span>
               </div>
             );
           })}
           <div style={{ display: "flex", gap: 10, justifyContent: "center", marginTop: 16 }}>
-            <button className="nes-btn is-primary" style={{ fontSize: "0.75rem" }} onClick={startQuiz}>Retry</button>
-            <button className="nes-btn" style={{ fontSize: "0.75rem" }} onClick={() => setQuiz(null)}>Back</button>
+            <button className="nes-btn is-primary" style={{ fontSize: "0.75rem" }} onClick={startQuiz}>重试</button>
+            <button className="nes-btn" style={{ fontSize: "0.75rem" }} onClick={() => setQuiz(null)}>返回</button>
           </div>
         </div>
       );
@@ -354,7 +354,7 @@ export default function VocabPage() {
     return (
       <div style={{ maxWidth: 500, margin: "0 auto" }}>
         <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginBottom: 10 }}>
-          Question {qIdx + 1} of {quiz.length}
+          第 {qIdx + 1} / {quiz.length} 题
         </p>
         <div className="window" style={{ padding: "24px 20px", textAlign: "center", marginBottom: 16 }}>
           <div style={{ fontSize: "1.3rem", fontFamily: "var(--font-mono)", color: "var(--accent)", marginBottom: 6 }}>
@@ -377,8 +377,8 @@ export default function VocabPage() {
   return (
     <div className="page-content">
       <header>
-        <h1>Vocab Vault</h1>
-        <p>Your personal vocabulary treasure — collected from all learning modules</p>
+        <h1>词汇库</h1>
+        <p>你的个人词汇宝库——来自所有学习模块</p>
       </header>
 
       {renderTabs()}

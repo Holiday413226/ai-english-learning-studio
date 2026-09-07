@@ -8,9 +8,9 @@ export default function OutputDisplay({ result, loading, error }) {
   if (loading) {
     return (
       <>
-        <h3 className="window-title">Translation Output</h3>
+        <h3 className="window-title">翻译结果</h3>
         <div className="loading-box">
-          <p>AI is translating your novel... please wait</p>
+          <p>AI 正在翻译你的小说…请稍候</p>
           <progress className="nes-progress is-primary" max="100"></progress>
         </div>
       </>
@@ -20,7 +20,7 @@ export default function OutputDisplay({ result, loading, error }) {
   if (error) {
     return (
       <>
-        <h3 className="window-title">Translation Output</h3>
+        <h3 className="window-title">翻译结果</h3>
         <div className="error-box">
           <p>{error}</p>
         </div>
@@ -31,9 +31,9 @@ export default function OutputDisplay({ result, loading, error }) {
   if (!result) {
     return (
       <>
-        <h3 className="window-title">Translation Output</h3>
+        <h3 className="window-title">翻译结果</h3>
         <div className="placeholder-box">
-          <p>Translated text will appear here after you press both Ready buttons...</p>
+          <p>两个「就绪」按钮都按下后，译文将显示在这里…</p>
         </div>
       </>
     );
@@ -57,7 +57,7 @@ export default function OutputDisplay({ result, loading, error }) {
 
   return (
     <>
-      <h3 className="window-title">Translation Output</h3>
+      <h3 className="window-title">翻译结果</h3>
 
       <div
         className="output-area"
@@ -67,21 +67,21 @@ export default function OutputDisplay({ result, loading, error }) {
         onKeyDown={(e) => {
           if (e.key === "Enter") setModalOpen(true);
         }}
-        title="Click to open full-screen reader"
+        title="点击打开全屏阅读器"
       >
         <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
       </div>
 
       <div className="output-actions">
         <span className="highlight-count">
-          {result.highlights.length} CET-4/6 vocabulary words highlighted
+          {result.highlights.length} 个四六级词汇已高亮
         </span>
         <button
           type="button"
           className="nes-btn is-primary block-btn"
           onClick={handleDownload}
         >
-          Download Translated TXT
+          下载译文 TXT
         </button>
       </div>
 

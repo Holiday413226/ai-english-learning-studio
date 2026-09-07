@@ -34,6 +34,7 @@ from datetime import datetime, timezone, timedelta
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from core.config import FLASK_PORT, FLASK_HOST, MAX_CONTENT_LENGTH
+from core.paths import get_data_root
 from shutdown import register_shutdown_handlers, request_shutdown, is_shutting_down
 
 
@@ -115,6 +116,9 @@ def create_app() -> Flask:
             "debate_bot_id": "debateBotId",
             "discuss_bot_id": "discussBotId",
             "minecraft_bot_id": "minecraftBotId",
+            "ai_mode": "aiMode",
+            "gateway_url": "gatewayUrl",
+            "activation_code": "activationCode",
         }
         result = {}
         for key_name, frontend_name in name_map.items():
@@ -145,9 +149,7 @@ def create_app() -> Flask:
         if data_dir:
             data_root = Path(data_dir)
         else:
-            data_root = Path(os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "data"
-            ))
+            data_root = Path(get_data_root())
 
         now_ts = time.time()
         today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -296,6 +298,21 @@ def create_app() -> Flask:
             return send_from_directory(static_dir, "index.html")
         return jsonify({"error": "Not found"}), 404
 
+    # ── Global error handler: API errors always return JSON, never HTML ──
+    # The SPA calls response.json() on every fetch; Flask's default 500/HTML
+    # page would make it throw "Unexpected token '<'".  Return JSON instead so
+    # the frontend surfaces a readable error message.
+    from werkzeug.exceptions import HTTPException
+
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(e):
+        # Keep expected HTTP errors (404/405/… ) on their default behavior.
+        if isinstance(e, HTTPException):
+            return e
+        if request.path.startswith("/api/"):
+            return jsonify({"error": str(e) or type(e).__name__}), 500
+        return "Internal Server Error", 500
+
     # Attach state for the startup block below
     app._has_static = has_static
     app._static_dir = static_dir
@@ -335,6 +352,11 @@ if __name__ == "__main__":
 
         # Give Flask a moment to start, then launch the native window.
         time.sleep(1.0)
+
+        # Enable file downloads (TXT / CSV export). WebView2 cancels downloads
+        # by default (ALLOW_DOWNLOADS defaults to False), which silently broke
+        # the "Download Translated TXT" and "CSV Export" buttons in the exe.
+        webview.settings['ALLOW_DOWNLOADS'] = True
 
         webview.create_window(
             title="AI English Learning Studio v2.0.0",

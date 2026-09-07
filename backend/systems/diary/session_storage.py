@@ -9,15 +9,15 @@ import threading
 from pathlib import Path
 from datetime import date, datetime, timedelta, timezone
 
+from core.paths import get_data_root
+
 
 class DiarySessionStorage:
     """Thread-safe JSON storage for diary entries with streak computation."""
 
     def __init__(self, data_dir: str = None):
         if data_dir is None:
-            data_dir = os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "..", "..", "data"
-            )
+            data_dir = get_data_root()
         self._system_dir = Path(data_dir) / "diary"
         self._system_dir.mkdir(parents=True, exist_ok=True)
         self._entries_file = self._system_dir / "entries.json"

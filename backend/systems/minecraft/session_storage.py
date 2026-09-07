@@ -14,6 +14,8 @@ import uuid
 import threading
 from pathlib import Path
 
+from core.paths import get_data_root
+
 
 class MinecraftSessionStorage:
     """Thread-safe JSON file persistence for Minecraft chat sessions."""
@@ -23,7 +25,7 @@ class MinecraftSessionStorage:
 
     def __init__(self, data_dir: str = None):
         if data_dir is None:
-            data_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "data")
+            data_dir = get_data_root()
         self._system_dir = Path(data_dir) / "minecraft"
         self._system_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.Lock()

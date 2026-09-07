@@ -8,7 +8,7 @@ export default function ApiKeyInput({ apiKey, setApiKey }) {
       <input
         type={show ? "text" : "password"}
         className="nes-input api-key-input"
-        placeholder="Enter your DeepSeek API Key..."
+        placeholder="请输入你的 DeepSeek API 密钥…"
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}
       />
@@ -17,7 +17,7 @@ export default function ApiKeyInput({ apiKey, setApiKey }) {
         className="nes-btn is-warning"
         onClick={() => setShow((s) => !s)}
       >
-        {show ? "Hide" : "Show"}
+        {show ? "隐藏" : "显示"}
       </button>
     </div>
   );

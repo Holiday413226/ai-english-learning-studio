@@ -7,7 +7,7 @@ export default function VocabInput({ vocabText, setVocabText, ready, setReady })
 
   const handleFile = (file) => {
     if (!file.name.endsWith(".txt")) {
-      alert("Please upload a .txt file (UTF-8 encoded)");
+      alert("请上传 .txt 文件（UTF-8 编码）");
       return;
     }
     const reader = new FileReader();
@@ -33,7 +33,7 @@ export default function VocabInput({ vocabText, setVocabText, ready, setReady })
 
   return (
     <>
-      <h3 className="window-title">Step 2 — Upload CET-4/6 Vocabulary (.txt)</h3>
+      <h3 className="window-title">第 2 步 — 上传四六级词汇表（.txt）</h3>
       <div
         className={`drop-zone ${dragOver ? "drag-over" : ""} ${vocabText ? "has-file" : ""}`}
         onDragOver={(e) => {
@@ -51,10 +51,10 @@ export default function VocabInput({ vocabText, setVocabText, ready, setReady })
       >
         {vocabText ? (
           <p>
-            <strong>{fileName}</strong> — {vocabCount} vocabulary words
+            <strong>{fileName}</strong> — {vocabCount} 个单词
           </p>
         ) : (
-          <p>Drag & drop a vocabulary .txt file here, or click to browse</p>
+          <p>将词汇表 .txt 文件拖到这里，或点击浏览选择</p>
         )}
         <input
           ref={fileInputRef}
@@ -72,7 +72,7 @@ export default function VocabInput({ vocabText, setVocabText, ready, setReady })
         disabled={!vocabText}
         onClick={() => setReady((r) => !r)}
       >
-        {ready ? "Ready — Click to unready" : "Ready"}
+        {ready ? "已就绪 — 点击取消就绪" : "就绪"}
       </button>
     </>
   );

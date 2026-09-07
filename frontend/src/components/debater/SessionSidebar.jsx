@@ -30,14 +30,14 @@ export default function SessionSidebar({}) {
           className="nes-btn is-primary debater-new-chat-btn"
           onClick={handleNewChat}
         >
-          + New Chat
+          + 新对话
         </button>
         <button
           className="nes-btn is-warning debater-settings-btn"
           onClick={openSettings}
-          title="Settings"
+          title="设置"
         >
-          Settings
+          设置
         </button>
       </div>
 
@@ -47,7 +47,7 @@ export default function SessionSidebar({}) {
             session.messages
               .filter((m) => m.role === "user")
               .slice(-1)[0]
-              ?.content?.slice(0, 40) || "New Chat";
+              ?.content?.slice(0, 40) || "新对话";
 
           return (
             <div
@@ -65,11 +65,11 @@ export default function SessionSidebar({}) {
                 className="debater-session-delete"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (window.confirm("Delete this chat session?")) {
+                  if (window.confirm("确定删除这段对话吗？")) {
                     deleteSession(id);
                   }
                 }}
-                title="Delete session"
+                title="删除对话"
               >
                 x
               </button>
@@ -79,7 +79,7 @@ export default function SessionSidebar({}) {
 
         {sortedSessions.length === 0 && (
           <p className="debater-sessions-empty">
-            No chats yet. Start a new one!
+            还没有对话，开始一个新对话吧！
           </p>
         )}
       </div>

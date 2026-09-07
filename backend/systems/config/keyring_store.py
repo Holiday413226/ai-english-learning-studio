@@ -28,6 +28,9 @@ ALL_KEYS = [
     "debate_bot_id",
     "discuss_bot_id",
     "minecraft_bot_id",
+    "ai_mode",
+    "gateway_url",
+    "activation_code",
 ]
 
 # ── Encrypted file fallback ──────────────────────────────────
@@ -240,6 +243,9 @@ def get_status() -> dict[str, bool]:
         "debate_bot_id": "debate_bot",
         "discuss_bot_id": "discuss_bot",
         "minecraft_bot_id": "minecraft_bot",
+        "ai_mode": "ai_mode",
+        "gateway_url": "gateway_url",
+        "activation_code": "activation_code",
     }
     result = {}
     for key_name in ALL_KEYS:

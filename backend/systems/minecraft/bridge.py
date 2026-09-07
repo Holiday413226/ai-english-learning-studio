@@ -8,6 +8,7 @@ import json
 import os
 import socket
 import subprocess
+import sys
 import threading
 import time
 
@@ -15,8 +16,18 @@ import time
 # ── Config (env-overridable) ──────────────────────────────────────────────
 
 # Mindcraft 已收敛进本仓库：默认指向 agent 内的 Minebot/mindcraft（可用 MINEBOT_DIR 覆盖）
-_AGENT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-MINEBOT_DIR = os.getenv("MINEBOT_DIR", os.path.join(_AGENT_ROOT, "Minebot", "mindcraft"))
+if getattr(sys, "frozen", False):
+    # EXE mode: runtime 位于 exe 同级的 runtime/（捆绑的 node.exe + mindcraft）。
+    _EXE_DIR = os.path.dirname(sys.executable)
+    _DEFAULT_MINEBOT_DIR = os.path.join(_EXE_DIR, "runtime", "mindcraft")
+    _NODE_EXE = os.path.join(_EXE_DIR, "runtime", "node", "node.exe")
+else:
+    # Dev mode: mindcraft 在本仓库内，node 走系统 PATH。
+    _AGENT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+    _DEFAULT_MINEBOT_DIR = os.path.join(_AGENT_ROOT, "Minebot", "mindcraft")
+    _NODE_EXE = None
+
+MINEBOT_DIR = os.getenv("MINEBOT_DIR", _DEFAULT_MINEBOT_DIR)
 MINEBOT_HOST = os.getenv("MINEBOT_HOST", "127.0.0.1")
 MINEBOT_PORT = int(os.getenv("MINEBOT_PORT", "8080"))
 
@@ -28,6 +39,29 @@ def _is_port_open(host: str, port: int, timeout: float = 1.0) -> bool:
             return True
     except (ConnectionRefusedError, OSError):
         return False
+
+
+def _child_env() -> dict:
+    """Build the environment for the Node Mindcraft child process.
+
+    Mindcraft resolves the DeepSeek key via ``getKey('DEEPSEEK_API_KEY')``
+    (src/utils/keys.js), which reads ``./keys.json`` first, then falls back
+    to ``process.env['DEEPSEEK_API_KEY']``.  We deliberately do NOT write a
+    ``keys.json`` into runtime/ — that would drop a plaintext key into the
+    distributable.  Instead, inject the key the user already stored in the
+    Windows credential store straight into the child process environment.
+    """
+    env = os.environ.copy()
+    try:
+        from systems.config.keyring_store import get_key
+        deepseek_key = get_key("deepseek_api_key")
+        if deepseek_key:
+            env["DEEPSEEK_API_KEY"] = deepseek_key
+    except Exception:
+        # Keyring may be unavailable (first run / EXE sandbox) — leave the
+        # child to fall back to keys.json or pre-existing env vars.
+        pass
+    return env
 
 
 # ── Layer selector — read/write the deepseek profile's `layers` field ──────
@@ -128,10 +162,11 @@ class MinebotBridge:
             try:
                 # No stdio redirects — inherit parent console so the Node
                 # process can open its browser UI (auto_open_ui) freely.
+                node_cmd = _NODE_EXE if (_NODE_EXE and os.path.isfile(_NODE_EXE)) else "node"
                 self._process = subprocess.Popen(
-                    ["node", "main.js"],
+                    [node_cmd, "main.js"],
                     cwd=mindcraft_dir,
-                    env=os.environ.copy(),
+                    env=_child_env(),
                 )
             except FileNotFoundError:
                 return {"status": "error",

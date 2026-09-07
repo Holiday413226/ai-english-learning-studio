@@ -1,0 +1,28 @@
+# Docker build context is the repo root (see gateway/docker-compose.yml).
+# Never bake credentials or runtime data into the image.
+
+# Secrets — MUST stay out of the image
+.env
+gateway/.env
+
+# Runtime data (SQLite activation codes, session JSON)
+gateway/data/
+backend/data/
+backend/config.json
+
+# Build artifacts / caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+backend/build/
+backend/dist/
+backend/static/
+backend/static_zh/
+
+# Not needed by the gateway (keeps the build context small)
+frontend/
+Minebot/
+tests/
+.git/
+.claude/
+*.spec

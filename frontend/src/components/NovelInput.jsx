@@ -7,7 +7,7 @@ export default function NovelInput({ novelText, setNovelText, ready, setReady })
 
   const handleFile = (file) => {
     if (!file.name.endsWith(".txt")) {
-      alert("Please upload a .txt file (UTF-8 encoded)");
+      alert("请上传 .txt 文件（UTF-8 编码）");
       return;
     }
     const reader = new FileReader();
@@ -47,10 +47,10 @@ export default function NovelInput({ novelText, setNovelText, ready, setReady })
       >
         {novelText ? (
           <p>
-            <strong>{fileName}</strong> — {charCount.toLocaleString()} characters
+            <strong>{fileName}</strong> — {charCount.toLocaleString()} 字
           </p>
         ) : (
-          <p>Drag & drop a Chinese novel .txt file here, or click to browse</p>
+          <p>将中文小说 .txt 文件拖到这里，或点击浏览选择</p>
         )}
         <input
           ref={fileInputRef}
@@ -68,7 +68,7 @@ export default function NovelInput({ novelText, setNovelText, ready, setReady })
         disabled={!novelText}
         onClick={() => setReady((r) => !r)}
       >
-        {ready ? "Ready — Click to unready" : "Ready"}
+        {ready ? "已就绪 — 点击取消就绪" : "就绪"}
       </button>
     </>
   );

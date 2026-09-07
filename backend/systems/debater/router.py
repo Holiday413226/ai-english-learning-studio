@@ -1,6 +1,6 @@
 """Debater subsystem routes.
 
-POST   /api/debater/chat      — send message to COZE bot, get AI reply
+POST   /api/debater/chat      — send message (DeepSeek or COZE), get AI reply
 POST   /api/debater/score     — score conversation via DeepSeek
 GET    /api/debater/sessions   — list all sessions (metadata)
 GET    /api/debater/session    — get full session with messages
@@ -9,8 +9,10 @@ DELETE /api/debater/session    — delete a session
 
 from flask import request, jsonify
 from core.coze_client import chat_with_bot
+from systems.debater.deepseek_client import chat_with_deepseek
 from systems.debater.session_storage import debater_storage
 from systems.debater.scorer import score_conversation
+from core.gateway_client import run_ai, is_hosted
 
 
 def register_debater_routes(app):
@@ -18,12 +20,13 @@ def register_debater_routes(app):
 
     @app.route("/api/debater/chat", methods=["POST"])
     def debater_chat():
-        """Send a message to COZE and return the AI response.
+        """Send a message and return the AI response.
 
         Body: {
-            api_key: str, bot_id: str, session_id: str,
+            provider: "deepseek"|"coze" (default "coze"),
+            api_key: str, bot_id: str (COZE only), session_id: str,
             message: str, mode: "debate"|"discuss",
-            api_url: str (optional)
+            api_url: str (optional, COZE only)
         }
         Returns: { session_id, text, audio_url }
         """
@@ -31,6 +34,7 @@ def register_debater_routes(app):
         if not data:
             return jsonify({"error": "Request body must be JSON"}), 400
 
+        provider = data.get("provider", "coze").strip().lower()
         api_key = data.get("api_key", "").strip()
         bot_id = data.get("bot_id", "").strip()
         session_id = data.get("session_id", "").strip()
@@ -38,32 +42,73 @@ def register_debater_routes(app):
         mode = data.get("mode", "debate")
         api_url = data.get("api_url", "").strip() or None
 
-        # Validation
-        if not api_key:
-            return jsonify({"error": "COZE API Key is required"}), 400
-        if not bot_id:
-            return jsonify({"error": "Bot ID is required"}), 400
+        # Shared validation
+        if provider not in ("deepseek", "coze"):
+            return jsonify({"error": "Provider must be 'deepseek' or 'coze'"}), 400
         if not message:
             return jsonify({"error": "Message is required"}), 400
         if mode not in ("debate", "discuss"):
             return jsonify({"error": "Mode must be 'debate' or 'discuss'"}), 400
+        if not api_key and not is_hosted():
+            label = "DeepSeek" if provider == "deepseek" else "COZE"
+            return jsonify({"error": f"{label} API Key is required"}), 400
 
-        # Ensure session exists
+        # ── DeepSeek provider ────────────────────────────────────
+        if provider == "deepseek":
+            # DeepSeek is stateless: no bot_id, no conversation_id.
+            sid = debater_storage.get_or_create(session_id, mode=mode, bot_id="")
+
+            if debater_storage.is_full(sid):
+                return jsonify({"error": "Session message limit reached (100)"}), 400
+
+            history = debater_storage.get_messages(sid) or []
+            history.append({"role": "user", "content": message})
+
+            try:
+                result = run_ai(
+                    "debater_chat_deepseek",
+                    {"mode": mode, "messages": history},
+                    lambda: chat_with_deepseek(api_key, mode, history),
+                )
+            except RuntimeError as e:
+                return jsonify({"error": str(e)}), 502
+
+            debater_storage.add_messages(sid, [
+                {"role": "user", "content": message, "audio_url": None},
+                {
+                    "role": "assistant",
+                    "content": result["text"],
+                    "audio_url": result.get("audio_url"),
+                },
+            ])
+
+            return jsonify({
+                "session_id": sid,
+                "text": result["text"],
+                "audio_url": result.get("audio_url"),
+            })
+
+        # ── COZE provider (original flow) ────────────────────────
+        if not bot_id and not is_hosted():
+            return jsonify({"error": "Bot ID is required"}), 400
+
         sid = debater_storage.get_or_create(session_id, mode=mode, bot_id=bot_id)
 
-        # Check message cap
         if debater_storage.is_full(sid):
             return jsonify({"error": "Session message limit reached (100)"}), 400
 
-        # Call COZE
         conversation_id = debater_storage.get_conversation_id(sid)
         try:
-            result = chat_with_bot(
-                api_key=api_key,
-                bot_id=bot_id,
-                user_message=message,
-                conversation_id=conversation_id,
-                api_url=api_url,
+            result = run_ai(
+                "debater_chat_coze",
+                {"mode": mode, "message": message, "conversation_id": conversation_id},
+                lambda: chat_with_bot(
+                    api_key=api_key,
+                    bot_id=bot_id,
+                    user_message=message,
+                    conversation_id=conversation_id,
+                    api_url=api_url,
+                ),
             )
         except RuntimeError as e:
             msg = str(e)
@@ -109,7 +154,7 @@ def register_debater_routes(app):
         api_key = data.get("api_key", "").strip()
         session_id = data.get("session_id", "").strip()
 
-        if not api_key:
+        if not api_key and not is_hosted():
             return jsonify({"error": "api_key is required"}), 400
         if not session_id:
             return jsonify({"error": "session_id is required"}), 400
@@ -124,7 +169,11 @@ def register_debater_routes(app):
 
         # Run scoring
         try:
-            result = score_conversation(api_key, messages)
+            result = run_ai(
+                "debater_score",
+                {"messages": messages},
+                lambda: score_conversation(api_key, messages),
+            )
         except RuntimeError as e:
             return jsonify({"error": str(e)}), 502
 
