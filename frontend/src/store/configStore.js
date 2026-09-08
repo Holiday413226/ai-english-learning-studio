@@ -29,7 +29,7 @@ const useConfigStore = create(
       deepseekApiKey: "",
 
       // ── Hosted gateway mode ─────────────────────────────────────
-      aiMode: "byok",          // "byok" (bring your own key) | "hosted"
+      aiMode: "hosted",        // "hosted" (激活码/托管) | "byok" (自备 Key)
       gatewayUrl: "",
       activationCode: "",
 

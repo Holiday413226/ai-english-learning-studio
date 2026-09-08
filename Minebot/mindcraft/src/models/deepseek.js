@@ -10,7 +10,7 @@ export class DeepSeek {
 
         let config = {};
 
-        config.baseURL = url || 'https://api.deepseek.com';
+        config.baseURL = url || process.env.DEEPSEEK_API_URL || 'https://api.deepseek.com';
         config.apiKey = getKey('DEEPSEEK_API_KEY');
 
         this.openai = new OpenAIApi(config);

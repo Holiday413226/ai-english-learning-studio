@@ -61,7 +61,7 @@ export default function App() {
       }
 
       // First launch: no credentials anywhere → show setup.
-      // ``aiMode`` is a selector (defaults to "byok"), not a credential, so it
+      // ``aiMode`` is a selector (defaults to "hosted"), not a credential, so it
       // is excluded from the "configured" check.
       const CREDENTIAL_KEYS = [
         "deepseekApiKey",

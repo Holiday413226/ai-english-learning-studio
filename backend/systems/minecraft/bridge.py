@@ -54,9 +54,17 @@ def _child_env() -> dict:
     env = os.environ.copy()
     try:
         from systems.config.keyring_store import get_key
-        deepseek_key = get_key("deepseek_api_key")
-        if deepseek_key:
-            env["DEEPSEEK_API_KEY"] = deepseek_key
+        from core.gateway_client import is_hosted, get_gateway_url, get_activation_code
+        if is_hosted():
+            # Hosted mode: route the Minebot's DeepSeek calls through the
+            # gateway's OpenAI-compatible endpoint.  The activation code is
+            # used as the "API key" so getKey('DEEPSEEK_API_KEY') returns it.
+            env["DEEPSEEK_API_KEY"] = get_activation_code()
+            env["DEEPSEEK_API_URL"] = get_gateway_url() + "/v1"
+        else:
+            deepseek_key = get_key("deepseek_api_key")
+            if deepseek_key:
+                env["DEEPSEEK_API_KEY"] = deepseek_key
     except Exception:
         # Keyring may be unavailable (first run / EXE sandbox) — leave the
         # child to fall back to keys.json or pre-existing env vars.

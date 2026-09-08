@@ -10,8 +10,9 @@ desktop app calls in "hosted" mode.  Activation codes are validated and
 metered before any AI call is forwarded.
 
 Endpoints:
-    GET  /v1/health   — liveness check
-    POST /v1/ai       — {op, params} + Authorization: Bearer <code>
+    GET  /v1/health           — liveness check
+    POST /v1/ai               — {op, params} + Authorization: Bearer <code>
+    POST /v1/chat/completions — OpenAI-compatible (Minebot/Mindcraft DeepSeek)
 """
 
 import os
@@ -78,6 +79,30 @@ def create_app() -> Flask:
 
         audit.log(code, op, ok=True)
         return jsonify({"ok": True, "result": result})
+
+    @app.route("/v1/chat/completions", methods=["POST"])
+    def chat_completions():
+        auth = request.headers.get("Authorization", "")
+        code = auth[len("Bearer "):].strip() if auth.startswith("Bearer ") else ""
+
+        if not code:
+            return jsonify({"error": {"message": "缺少激活码", "type": "auth_error"}}), 401
+
+        try:
+            validate(code)
+        except AuthError as e:
+            audit.log(code, "chat_completions", ok=False, detail=f"auth: {e.message}")
+            return jsonify({"error": {"message": e.message, "type": "auth_error"}}), e.status_code
+
+        payload = request.get_json(silent=True) or {}
+        try:
+            result = ops.chat_completions(payload)
+        except Exception as e:  # noqa: BLE001
+            audit.log(code, "chat_completions", ok=False, detail=str(e))
+            return jsonify({"error": {"message": str(e), "type": "api_error"}}), 502
+
+        audit.log(code, "chat_completions", ok=True)
+        return jsonify(result)
 
     return app
 
