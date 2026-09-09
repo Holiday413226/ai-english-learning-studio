@@ -197,7 +197,13 @@ class MinebotBridge:
         return {"status": "ok", "message": "Minebot launching..."}
 
     def stop(self) -> dict:
-        """Gracefully stop the external process."""
+        """Gracefully stop the external process (and its child processes).
+
+        Mindcraft's main.js spawns one child ``init_agent.js`` per agent.
+        On Windows ``terminate()`` only kills the direct child, leaving those
+        agent processes orphaned — they then hold resources and can make the
+        next start crash.  ``taskkill /T`` kills the whole tree.
+        """
         with self._lock:
             if self._process is None:
                 return {"status": "not_running", "message": "No process."}
@@ -206,15 +212,24 @@ class MinebotBridge:
                 self._process = None
                 return {"status": "not_running", "message": "Already exited."}
 
+            pid = self._process.pid
             try:
-                self._process.terminate()
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(pid)],
+                    capture_output=True,
+                    timeout=15,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                # Fallback to the direct child only.
                 try:
-                    self._process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    self._process.kill()
-                    self._process.wait(timeout=5)
-            except OSError:
-                pass
+                    self._process.terminate()
+                    try:
+                        self._process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        self._process.kill()
+                        self._process.wait(timeout=5)
+                except OSError:
+                    pass
 
             self._process = None
 

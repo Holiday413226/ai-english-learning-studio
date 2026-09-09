@@ -367,8 +367,10 @@ if __name__ == "__main__":
         )
         webview.start()
 
-        # Window closed — shut down.
+        # Window closed — shut down.  Stop the Minebot child process tree so
+        # no orphan node processes linger and break the next launch.
         request_shutdown()
+        app.minebot_bridge.stop()
         sys.exit(0)
 
     # Dev mode: open browser, run Flask in foreground.
