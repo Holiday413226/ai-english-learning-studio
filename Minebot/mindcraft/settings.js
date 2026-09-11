@@ -10,8 +10,7 @@ const settings = {
     
     "base_profile": "assistant", // survival, assistant, creative, or god_mode
     "profiles": [
-    "./profiles/deepseek.json",
-    "./profiles/andy-4.json"
+    "./profiles/deepseek.json"
     ],
 
     "load_memory": false, // load memory from previous session
