@@ -133,6 +133,32 @@ def revoke(code: str) -> bool:
         return cur.rowcount > 0
 
 
+def update_code(code: str, daily_limit: int | None = None, total_limit: int | None = None) -> bool:
+    """Update a code's daily/total limits. Returns False if the code is missing
+    or no limit was provided."""
+    code = (code or "").strip()
+    with _lock:
+        c = _conn()
+        if c.execute("SELECT 1 FROM codes WHERE code = ?", (code,)).fetchone() is None:
+            c.close()
+            return False
+        sets, args = [], []
+        if daily_limit is not None:
+            sets.append("daily_limit = ?")
+            args.append(daily_limit)
+        if total_limit is not None:
+            sets.append("total_limit = ?")
+            args.append(total_limit)
+        if not sets:
+            c.close()
+            return False
+        args.append(code)
+        c.execute(f"UPDATE codes SET {', '.join(sets)} WHERE code = ?", args)
+        c.commit()
+        c.close()
+        return True
+
+
 def list_codes() -> list[dict]:
     """Return every code with its status (admin view)."""
     with _lock:

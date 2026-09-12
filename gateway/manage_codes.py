@@ -12,7 +12,7 @@ import argparse
 import sys
 from datetime import datetime, timedelta
 
-from auth import create_codes, revoke, list_codes, stats
+from auth import create_codes, revoke, update_code, list_codes, stats
 
 
 def parse_expiry(value: str) -> str | None:
@@ -44,6 +44,10 @@ def main() -> int:
     sub.add_parser("list", help="列出所有激活码")
     r = sub.add_parser("revoke", help="吊销激活码")
     r.add_argument("code")
+    u = sub.add_parser("update", help="修改激活码的每日/总限额")
+    u.add_argument("code")
+    u.add_argument("--daily-limit", type=int, default=None, help="每日调用上限（0=不限）")
+    u.add_argument("--total-limit", type=int, default=None, help="总调用上限（0=不限）")
     sub.add_parser("stats", help="汇总统计")
 
     args = p.parse_args()
@@ -76,6 +80,13 @@ def main() -> int:
             print(f"已吊销：{args.code}")
         else:
             print(f"未找到激活码：{args.code}")
+            return 1
+
+    elif args.cmd == "update":
+        if update_code(args.code, daily_limit=args.daily_limit, total_limit=args.total_limit):
+            print(f"已更新：{args.code}  daily_limit={args.daily_limit}  total_limit={args.total_limit}")
+        else:
+            print(f"未找到激活码或未提供限额：{args.code}")
             return 1
 
     elif args.cmd == "stats":
