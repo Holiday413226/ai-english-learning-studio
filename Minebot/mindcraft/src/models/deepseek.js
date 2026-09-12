@@ -22,7 +22,7 @@ export class DeepSeek {
         messages = strictFormat(messages);
 
         const pack = {
-            model: this.model_name || "deepseek-chat",
+            model: this.model_name || "deepseek-v4-pro",
             messages,
             stop: stop_seq,
             ...(this.params || {})

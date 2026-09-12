@@ -1,6 +1,6 @@
 {
     "name": "deepseek",
-    "model": "deepseek-chat",
+    "model": "deepseek-v4-pro",
     "embedding": "deepseek",
     "layers": {
         "intent": true,

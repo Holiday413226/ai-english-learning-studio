@@ -4,7 +4,7 @@ import os
 
 # DeepSeek API
 DEEPSEEK_API_BASE = os.getenv("DEEPSEEK_API_BASE", "https://api.deepseek.com/v1")
-DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-chat")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
 
 # Chunking
 MAX_CHUNK_SIZE = 2000  # characters per translation chunk

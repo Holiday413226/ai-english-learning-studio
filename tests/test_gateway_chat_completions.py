@@ -27,7 +27,7 @@ OPENAI_SHAPE = {
     "id": "chatcmpl-1",
     "object": "chat.completion",
     "created": 1,
-    "model": "deepseek-chat",
+    "model": "deepseek-v4-pro",
     "choices": [{"index": 0, "message": {"role": "assistant", "content": "hi"}, "finish_reason": "stop"}],
     "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
 }
@@ -46,7 +46,7 @@ def test_valid_code_returns_openai_shape(gw):
 
     gapp, _ = gw
     code = auth.create_codes(1)[0]
-    payload = {"model": "deepseek-chat", "messages": [{"role": "user", "content": "hi"}]}
+    payload = {"model": "deepseek-v4-pro", "messages": [{"role": "user", "content": "hi"}]}
 
     with patch("ops.chat_completions", return_value=OPENAI_SHAPE) as m:
         with gapp.test_client() as c:
@@ -81,7 +81,7 @@ def test_ops_chat_completions_injects_key(monkeypatch):
     fake_resp = MagicMock()
     fake_resp.id = "cmpl-1"
     fake_resp.created = 123
-    fake_resp.model = "deepseek-chat"
+    fake_resp.model = "deepseek-v4-pro"
     fake_resp.usage = MagicMock(prompt_tokens=1, completion_tokens=1, total_tokens=2)
     fake_resp.choices = [MagicMock()]
     fake_resp.choices[0].message.content = "hello"
@@ -92,7 +92,7 @@ def test_ops_chat_completions_injects_key(monkeypatch):
 
     with patch("openai.OpenAI", return_value=mock_client) as mock_openai:
         result = ops.chat_completions(
-            {"model": "deepseek-chat", "messages": [{"role": "user", "content": "hi"}]}
+            {"model": "deepseek-v4-pro", "messages": [{"role": "user", "content": "hi"}]}
         )
 
     assert result["choices"][0]["message"]["content"] == "hello"

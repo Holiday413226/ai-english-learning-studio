@@ -100,7 +100,7 @@ def chat_completions(payload: dict) -> dict:
     client = OpenAI(api_key=_deepseek_key(), base_url=base_url)
 
     kwargs = {
-        "model": payload.get("model") or "deepseek-chat",
+        "model": payload.get("model") or "deepseek-v4-pro",
         "messages": payload.get("messages") or [],
     }
     for k in ("temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty", "stop"):
