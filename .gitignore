@@ -46,3 +46,6 @@ Minebot/mindcraft/bots/
 Thumbs.db
 backend/data/
 AI-English-Learning-Studio-v2.0.0-source.zip
+
+# Junk files from Claude Code notify-signal path-mangling bug
+*claude-notify-signals*
