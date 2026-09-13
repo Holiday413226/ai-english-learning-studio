@@ -99,9 +99,12 @@ def chat_completions(payload: dict) -> dict:
     base_url = os.environ.get("AIES_DEEPSEEK_API_BASE", "https://api.deepseek.com/v1")
     client = OpenAI(api_key=_deepseek_key(), base_url=base_url)
 
+    # Minebot 专用：Minecraft 需要「快 + 有灵性」，用 flash 小模型 + 思考模式。
+    # 服务端强制（客户端传来的模型名被忽略），可用 AIES_MINECRAFT_MODEL 覆盖。
     kwargs = {
-        "model": payload.get("model") or "deepseek-v4-pro",
+        "model": os.environ.get("AIES_MINECRAFT_MODEL", "deepseek-v4-flash"),
         "messages": payload.get("messages") or [],
+        "extra_body": {"thinking": {"type": "enabled"}},
     }
     for k in ("temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty", "stop"):
         if k in payload and payload[k] is not None:
