@@ -8,7 +8,7 @@ import os
 import zipfile
 
 DIST = os.path.join(os.path.dirname(__file__), "..", "backend", "dist")
-OUT = os.path.join(DIST, "AIEnglishStudio-v3.0.0.zip")
+OUT = os.path.join(DIST, "AIEnglishStudio-v3.0.1.zip")
 
 EXES = ["AIEnglishStudio.exe", "AIEnglishStudio_zh.exe"]
 
